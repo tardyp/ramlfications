@@ -7,7 +7,7 @@ import attr
 from six import iteritems, itervalues
 from six.moves import BaseHTTPServer as httpserver  # NOQA
 
-from . import _parameter_tags
+from . import parameter_tags
 from .parameters import Content
 from .validate import *  # NOQA
 
@@ -22,6 +22,7 @@ METHOD_PROPERTIES = [
 ]
 
 RESOURCE_PROPERTIES = METHOD_PROPERTIES + ["base_uri_params", "uri_params"]
+
 
 @attr.s
 class RootNode(object):
