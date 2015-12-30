@@ -9,11 +9,11 @@ import attr
 from six import iteritems
 from six.moves import BaseHTTPServer as httpserver  # NOQA
 
-from . import parameter_tags
 from .parameters import Content
 from .validate import *  # NOQA
 
 from ._utils.parser_utils import _remove_duplicates
+from ._utils.parameter_utils import _replace_str_attr
 
 HTTP_RESP_CODES = httpserver.BaseHTTPRequestHandler.responses.keys()
 AVAILABLE_METHODS = [
@@ -313,25 +313,6 @@ class ResourceNode(BaseNode):
                              obj=self.resource_type))
         self._update_parameters(to_parse, RESOURCE_PROPERTIES)
 
-    def __replace_str_attr(self, param, new_value, current_str):
-        ptn = r'(<<\s*)(?P<pname>{0}\b[^\s|]*)(\s*\|?\s*(?P<tag>!\S*))?(\s*>>)'
-        p = re.compile(ptn.format(param))
-        ret = re.findall(p, current_str)
-        if not ret:
-            return current_str
-        for item in ret:
-            to_replace = "".join(item[0:3]) + item[-1]
-            tag_func = item[3]
-            if tag_func:
-                tag_func = tag_func.strip("!")
-                tag_func = tag_func.strip()
-                func = getattr(parameter_tags, tag_func)
-                if func:
-                    new_value = func(new_value)
-            current_str = current_str.replace(to_replace, str(new_value), 1)
-
-        return current_str
-
     def _update_parameters(self, to_parse, properties):
         for item in to_parse:
             obj = item.get("obj")
@@ -348,4 +329,4 @@ class ResourceNode(BaseNode):
             desc = getattr(obj, "desc")
             if desc:
                 if "resourcePath" in desc or "resourcePathName" in desc:
-                    self.desc = self.__replace_str_attr(name, value, desc)
+                    self.desc = _replace_str_attr(name, value, desc)

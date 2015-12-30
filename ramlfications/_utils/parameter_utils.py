@@ -15,7 +15,7 @@ PATTERN = r'(<<\s*)(?P<pname>{0}\b[^\s|]*)(\s*\|?\s*(?P<tag>!\S*))?(\s*>>)'
 #####
 # `<< parameter >>` substituion & parameter function tags
 #####
-def __replace_str_attr(param, new_value, current_str):
+def _replace_str_attr(param, new_value, current_str):
     """
     Replaces ``<<parameters>>`` with their assigned value, processed with \
     any function tags, e.g. ``!pluralize``.
@@ -47,7 +47,7 @@ def _substitute_parameters(obj, name, value, params):
         current_value = getattr(obj, s)
         if current_value:
             if isinstance(current_value, str):
-                new_value = __replace_str_attr(name, value, current_value)
+                new_value = _replace_str_attr(name, value, current_value)
                 setattr(obj, s, new_value)
 
 
