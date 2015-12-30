@@ -3,15 +3,12 @@
 
 from __future__ import absolute_import, division, print_function
 
-import copy
-import re
 
 import attr
 import markdown2 as md
 
 from ._utils import parameter_utils as pu
 from .validate import *  # NOQA
-
 
 
 NAMED_PARAMS = [

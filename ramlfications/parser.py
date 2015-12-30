@@ -4,9 +4,6 @@
 from __future__ import absolute_import, division, print_function
 
 
-import cProfile
-import time
-
 import copy
 import re
 
@@ -17,8 +14,7 @@ from six import iteritems, iterkeys, itervalues
 from .config import MEDIA_TYPES
 from .errors import InvalidRAMLError
 from .parameters import (
-    Documentation, Header, Body, Response, URIParameter, QueryParameter,
-    FormParameter, SecurityScheme
+    Documentation, Header, Body, Response, URIParameter, SecurityScheme
 )
 from .raml import RootNode, ResourceNode, ResourceTypeNode, TraitNode
 from .utils import load_schema
@@ -26,46 +22,15 @@ from .utils import load_schema
 # Private utility functions
 from ._utils.common_utils import _get
 from ._utils.parser_utils import (
-    security_schemes, create_body_objects, _lookup_resource_type, _set_param_trait_object,
-    _create_base_param_obj, _get_attribute, get_inherited,
-    _get_data_union, _get_inherited_item, _get_res_type_attribute,
-    _get_inherited_attribute, _remove_duplicates, _preserve_uri_order,
-    _parse_assigned_trait_dicts, _set_param_type_object, _set_params,
-    _set_params_test
+    security_schemes, create_body_objects, _lookup_resource_type,
+    _set_param_trait_object, _create_base_param_obj, _get_attribute,
+    get_inherited, _get_data_union, _get_inherited_item,
+    _get_res_type_attribute, _get_inherited_attribute, _remove_duplicates,
+    _preserve_uri_order, _parse_assigned_trait_dicts, _set_param_type_object,
+    _set_params, _set_params_test
 )
 
 __all__ = ["parse_raml"]
-
-
-def timeit(f):
-    def func_timer(*args, **kwargs):
-        start = time.time()
-        result = f(*args, **kwargs)
-        end = time.time()
-        print(f.__name__, 'took', end - start, 'time')
-        return result
-    return func_timer
-
-
-global counter
-counter = 0
-
-
-def countit(f):
-    def func_count(*args, **kwargs):
-        global counter
-        counter += 1
-        return f(*args, **kwargs)
-    return func_count
-
-
-# def profileit(f):
-#     def func_profile(*args, **kwargs):
-#         result = f(*args, **kwargs)
-#         pr.disable()
-#         pr.dumpstats(f.func_name)
-#         return result
-#     return func_profile
 
 
 def parse_raml(loaded_raml, config):
@@ -76,8 +41,6 @@ def parse_raml(loaded_raml, config):
     :returns: :py:class:`.raml.RootNode` object.
     :raises: :py:class:`.errors.InvalidRAMLError` when RAML file is invalid
     """
-    pr = cProfile.Profile()
-
     validate = str(_get(config, "validate")).lower() == 'true'
 
     # Postpone validating the root node until the end; otherwise,
@@ -464,7 +427,6 @@ def create_resource_types(raml_data, root):
                                       resource_types, root,
                                       inherit=True)
 
-
     def form_params(data):
         return _set_param_type_object(data, "formParameters", v,
                                       resource_types, root,
@@ -667,7 +629,6 @@ def create_resources(node, resources, root, parent):
     return resources
 
 
-@countit
 def create_node(name, raw_data, method, parent, root):
     """
     Create a Resource Node object.
@@ -727,29 +688,18 @@ def create_node(name, raw_data, method, parent, root):
     def headers():
         """Set resource's supported headers."""
         headers = _get_attribute("headers", method, raw_data)
-        header_objs = _get_inherited_attribute("headers", root, assigned_type,
-                                               method, assigned_traits)
 
         _headers = _create_base_param_obj(headers,
                                           Header,
                                           root.config,
                                           root.errors,
                                           method=method)
-        # if _headers is None:
-            # return header_objs or None
-        # return _remove_duplicates(header_objs, _headers)
         return _headers or None
 
     def body():
         """Set resource's supported request/response body."""
         bodies = _get_attribute("body", method, raw_data)
-        body_objects = _get_inherited_attribute("body", root, assigned_type,
-                                                method, assigned_traits)
-
         _body_objs = create_body_objects(bodies, root)
-        # if _body_objs == []:
-            # return body_objects or None
-        # return _remove_duplicates(body_objects, _body_objs)
         return _body_objs or None
 
     def responses():
@@ -807,7 +757,8 @@ def create_node(name, raw_data, method, parent, root):
             return body_list or None
 
         resps = _get_attribute("responses", method, raw_data)
-        resp_objs = _get_inherited_attribute("responses", root, res_type, method, assigned_traits)
+        resp_objs = _get_inherited_attribute("responses", root, res_type,
+                                             method, assigned_traits)
         # resp_objs = []
         resp_codes = [r.code for r in resp_objs]
         for k, v in list(iteritems(resps)):
@@ -865,7 +816,7 @@ def create_node(name, raw_data, method, parent, root):
         """Set resource's base URI parameters."""
         kw = dict(type=assigned_type, traits=assigned_traits, method=method)
         params = _set_params(raw_data, "base_uri_params", root,
-                                      inherit=True, **kw)
+                             inherit=True, **kw)
         declared = []
         if root.uri_params:
             declared = [p.name for p in root.uri_params]
@@ -883,7 +834,7 @@ def create_node(name, raw_data, method, parent, root):
         """Set resource's form parameters."""
         kw = dict(type=assigned_type, traits=assigned_traits, method=method)
         return _set_params(raw_data, "form_params", root,
-                                    inherit=True, **kw)
+                           inherit=True, **kw)
 
     def media_type_():
         """Set resource's supported media types."""

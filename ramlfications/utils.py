@@ -9,19 +9,8 @@ import logging
 import os
 import sys
 
-try:
-    from collections import OrderedDict
-except ImportError:  # NOCOV
-    from ordereddict import OrderedDict
-
-from six import iterkeys, iteritems
 import xmltodict
 
-from .parameters import (
-    Body, URIParameter, Header, FormParameter, QueryParameter
-)
-
-from ._utils.common_utils import _get
 
 PYVER = sys.version_info[:3]
 
@@ -193,4 +182,3 @@ def update_mime_types():
     _save_updated_mime_types(output_file, mime_types)
 
     log.debug("Done! Supported IANA MIME media types have been updated.")
-

@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function
 import copy
 
 import attr
-from six import iteritems, itervalues
+from six import iteritems
 from six.moves import BaseHTTPServer as httpserver  # NOQA
 
 from . import parameter_tags
@@ -271,7 +271,6 @@ class ResourceNode(BaseNode):
                         else:
                             res_prop.append(inherited_prop)
 
-
     def _parse_trait_parameters(self):
         to_parse = []
         for t in self.is_:
@@ -289,7 +288,7 @@ class ResourceNode(BaseNode):
                                          value=self.name,
                                          obj=trait_obj))
                     to_parse.append(dict(name="resourcePathName",
-                                         value = self.name[1:],
+                                         value=self.name[1:],
                                          obj=trait_obj))
         self._update_parameters(to_parse, RESOURCE_PROPERTIES)
 
@@ -303,19 +302,20 @@ class ResourceNode(BaseNode):
                 # but just being safe...
                 if isinstance(value, dict):
                     for param, v in list(iteritems(value)):
-                        to_parse.append(dict(name=param, value=v, obj=self.resource_type))
+                        to_parse.append(dict(name=param, value=v,
+                                             obj=self.resource_type))
 
         to_parse.append(dict(name="resourcePath",
                              value=self.name,
                              obj=self.resource_type))
         to_parse.append(dict(name="resourcePathName",
-                             value = self.name[1:],
+                             value=self.name[1:],
                              obj=self.resource_type))
         self._update_parameters(to_parse, RESOURCE_PROPERTIES)
 
     def __replace_str_attr(self, param, new_value, current_str):
-        pattern = r'(<<\s*)(?P<pname>{0}\b[^\s|]*)(\s*\|?\s*(?P<tag>!\S*))?(\s*>>)'
-        p = re.compile(pattern.format(param))
+        ptn = r'(<<\s*)(?P<pname>{0}\b[^\s|]*)(\s*\|?\s*(?P<tag>!\S*))?(\s*>>)'
+        p = re.compile(ptn.format(param))
         ret = re.findall(p, current_str)
         if not ret:
             return current_str

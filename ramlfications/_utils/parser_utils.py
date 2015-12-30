@@ -13,7 +13,7 @@ except ImportError:  # NOCOV
     from ordereddict import OrderedDict
 
 from ramlfications.parameters import (
-    Documentation, Header, Body, Response, URIParameter, QueryParameter,
+    Header, Body, Response, URIParameter, QueryParameter,
     FormParameter, SecurityScheme
 )
 from ramlfications.utils import load_schema
@@ -35,6 +35,7 @@ def _get_scheme(item, root):
         elif isinstance(item, dict):
             if list(iterkeys(item))[0] == list(iterkeys(s))[0]:
                 return s
+
 
 def security_schemes(secured, root):
     """Set resource's assigned security scheme objects."""
@@ -75,6 +76,7 @@ def create_body_objects(data, root):
         )
         ret_objs.append(body)
     return ret_objs
+
 
 #####
 # General Helper Functions
@@ -181,10 +183,10 @@ def _remove_duplicates(inherit_params, resource_params):
     ret.extend(resource_params)
     return ret or None
 
+
 #####
 # Creating Named Parameter-like Objects
 #####
-
 def _create_base_param_obj(attribute_data, param_obj, config, errors, **kw):
     """Helper function to create a BaseParameter object"""
     objects = []
@@ -225,7 +227,8 @@ def _create_base_param_obj(attribute_data, param_obj, config, errors, **kw):
 # helper func for below
 def __find_set_object(params, name, root, method=None):
     param_obj = _map_param_unparsed_str_obj(name)
-    return _create_base_param_obj(params, param_obj, root.config, root.errors, method=method)
+    return _create_base_param_obj(params, param_obj, root.config, root.errors,
+                                  method=method)
 
 
 # set uri, form, query, header objects for Trait Nodes, Security Scheme Nodes
@@ -248,7 +251,8 @@ def __get_inherited_type_data(data, resource_types):
 
 
 # set parameter objects for Resource Type Nodes
-def _set_param_type_object(data, name, raw_data, res_type, root, inherit=False):
+def _set_param_type_object(data, name, raw_data, res_type, root,
+                           inherit=False):
     m_data, r_data = _get_res_type_attribute(raw_data, data, name)
     param_data = dict(list(iteritems(m_data)) + list(iteritems(r_data)))
     if inherit:
@@ -325,7 +329,7 @@ def __map_parsed_str(parsed):
 
 
 def _set_params(data, attr_name, root, inherit=False, **kw):
-    params, param_objs, parent_params, root_params = [], [], [], []
+    params, inherit_objs, parent_params, root_params = [], [], [], []
 
     unparsed = __map_parsed_str(attr_name)
     param_class = _map_param_unparsed_str_obj(unparsed)
@@ -526,7 +530,6 @@ def __root(item, **kwargs):
 
 
 def get_inherited(item, inherit_from=[], **kwargs):
-    ret = {}
     for nodetype in inherit_from:
         inherit_func = __map_inheritance(nodetype)
         inherited = inherit_func(item, **kwargs)
