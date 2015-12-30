@@ -67,6 +67,7 @@ def __param_filter(param, obj, attr, default=None):
 
 def _inherit_type_properties(obj, params, named_params):
     for param in params:
+        print("[UTILS] param: {0}".format(param))
         set_type = True
         if type(obj).__name__ == 'Body':
             set_type = __param_filter(param, obj, "mime_type")

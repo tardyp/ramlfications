@@ -431,6 +431,45 @@ def test_inherited_assigned_trait_params_articles(trait_parameters):
     assert resp_headers.description.raw == desc
 
 
+def test_inherited_assigned_trait_params_videos(trait_parameters):
+    res = trait_parameters.resources[2]
+
+    assert res.name == "/videos"
+    assert res.method == "get"
+    assert len(res.traits) == 2
+    assert len(res.query_params) == 4
+    assert len(res.headers) == 1
+    assert len(res.body) == 1
+    assert len(res.responses) == 1
+
+    q_param = res.query_params[2]
+    assert q_param.name == "bar_token"
+    assert q_param.description.raw == "A valid bar_token is required"
+
+    q_param = res.query_params[3]
+    assert q_param.name == "numPages"
+    desc = "The number of pages to return, not to exceed 30"
+    assert q_param.description.raw == desc
+
+    header = res.headers[0]
+    assert header.name == "x-bar-header"
+    assert header.description.raw == "x-bar-header is required here"
+
+    body = res.body[0]
+    assert body.mime_type == "application/json"
+    assert body.schema == "baz-schema"
+
+    resp = res.responses[0]
+    assert resp.code == 200
+    assert resp.description.raw == "No more than 30 pages returned"
+    assert len(resp.headers) == 1
+
+    resp_headers = resp.headers[0]
+    assert resp_headers.name == "x-another-bar-header"
+    desc = "some description for x-another-bar-header"
+    assert resp_headers.description.raw == desc
+
+
 def test_assigned_trait_params(trait_parameters):
     res = trait_parameters.resources[0]
     assert len(res.traits) == 2
@@ -1360,25 +1399,25 @@ def test_resource_inherited_no_overwrite(inherited_resources):
     first_param = res.query_params[0]
     second_param = res.query_params[1]
 
-    assert second_param.name == "inherited"
-    assert second_param.description.raw == "An inherited parameter"
+    assert first_param.name == "inherited"
+    assert first_param.description.raw == "An inherited parameter"
 
-    assert first_param.name == "overwritten"
+    assert second_param.name == "overwritten"
     desc = "This query param description should be used"
-    assert first_param.description.raw == desc
+    assert second_param.description.raw == desc
 
     # test form params
-    first_param = res.form_params[0]
+    second_param = res.form_params[0]
 
     desc = "This description should be inherited"
-    assert first_param.description.raw == desc
+    assert second_param.description.raw == desc
 
     example = "This example for the overwritten form param should be used"
-    assert first_param.example == example
+    assert second_param.example == example
 
-    assert first_param.type == "string"
-    assert first_param.min_length == 1
-    assert first_param.max_length == 5
+    assert second_param.type == "string"
+    assert second_param.min_length == 1
+    assert second_param.max_length == 5
 
     # test headers
     first_header = res.headers[0]

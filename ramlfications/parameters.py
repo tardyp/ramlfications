@@ -3,6 +3,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+import copy
 import re
 
 import attr
@@ -320,8 +321,10 @@ class Response(object):
         recurse_objs = ["headers", "body"]
         for r in recurse_objs:
             r_objs = getattr(self, r)
+            print("[PARAMETERS] inherited: {0}".format(inherited_param))
             if r_objs:
                 for o in r_objs:
+                    print("[PARAMETERS]: o: {0}".format(o))
                     o._inherit_type_properties(inherited_param)
 
     def _substitute_parameters(self, obj, name, value):

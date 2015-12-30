@@ -3,6 +3,8 @@
 
 from __future__ import absolute_import, division, print_function
 
+import copy
+
 import attr
 from six import iteritems, itervalues
 from six.moves import BaseHTTPServer as httpserver  # NOQA
@@ -10,6 +12,8 @@ from six.moves import BaseHTTPServer as httpserver  # NOQA
 from . import parameter_tags
 from .parameters import Content
 from .validate import *  # NOQA
+
+from ._utils.parser_utils import _remove_duplicates
 
 HTTP_RESP_CODES = httpserver.BaseHTTPRequestHandler.responses.keys()
 AVAILABLE_METHODS = [
@@ -230,6 +234,43 @@ class ResourceNode(BaseNode):
                 for r in resource_prop:
                     r._inherit_type_properties(inherited_prop)
 
+    def _inherit_type_test(self):
+        for p in RESOURCE_PROPERTIES:
+            inherited_prop = getattr(self.resource_type, p, False)
+            if inherited_prop:
+                inherited_copy = copy.deepcopy(inherited_prop)
+                res_prop = getattr(self, p)
+                if not res_prop:
+                    setattr(self, p, inherited_copy)
+                # list of query, uri, etc
+                if isinstance(res_prop, list):
+                    if isinstance(inherited_copy, list):
+                        ret = _remove_duplicates(inherited_copy, res_prop)
+                        setattr(self, p, ret)
+                        # res_prop.extend(inherited_copy)
+
+                    else:
+                        res_prop.append(inherited_copy)
+            # print("[RAML] self.name {0}".format(self.name))
+            # print("[RAML] self.resource_type: {0}".format(self.resource_type))
+            # print("[RAML] self.resource_type q_params: {0}".format(self.resource_type.query_params))
+
+    def _inherit_trait_objects(self):
+        for t in self.traits:
+            for p in RESOURCE_PROPERTIES:
+                inherited_prop = getattr(t, p, False)
+                if inherited_prop:
+                    res_prop = getattr(self, p)
+                    if not res_prop:
+                        setattr(self, p, inherited_prop)
+                    # list of query, uri, etc
+                    if isinstance(res_prop, list):
+                        if isinstance(inherited_prop, list):
+                            res_prop.extend(inherited_prop)
+                        else:
+                            res_prop.append(inherited_prop)
+
+
     def _parse_trait_parameters(self):
         to_parse = []
         for t in self.is_:
@@ -283,7 +324,7 @@ class ResourceNode(BaseNode):
             if tag_func:
                 tag_func = tag_func.strip("!")
                 tag_func = tag_func.strip()
-                func = getattr(_parameter_tags, tag_func)
+                func = getattr(parameter_tags, tag_func)
                 if func:
                     new_value = func(new_value)
             current_str = current_str.replace(to_replace, str(new_value), 1)
@@ -300,7 +341,9 @@ class ResourceNode(BaseNode):
                 props = getattr(obj, p)
                 if props:
                     for i in props:
-                        i._substitute_parameters(i, name, value)
+                        if not isinstance(i, list):
+                            i._substitute_parameters(i, name, value)
+
             desc = getattr(obj, "desc")
             if desc:
                 if "resourcePath" in desc or "resourcePathName" in desc:

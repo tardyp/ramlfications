@@ -163,12 +163,17 @@ def _remove_duplicates(inherit_params, resource_params):
     ret = []
     if isinstance(resource_params[0], Body):
         _params = [p.mime_type for p in resource_params]
+    elif isinstance(resource_params[0], Response):
+        _params = [p.code for p in resource_params]
     else:
         _params = [p.name for p in resource_params]
 
     for p in inherit_params:
         if isinstance(p, Body):
             if p.mime_type not in _params:
+                ret.append(p)
+        elif isinstance(p, Response):
+            if p.code not in _params:
                 ret.append(p)
         else:
             if p.name not in _params:
@@ -347,6 +352,37 @@ def _set_params(data, attr_name, root, inherit=False, **kw):
     to_clean = (params, inherit_objs, parent_params, root_params)
     return __remove_duplicates(to_clean)
 # </--[query, base uri, form]-->
+
+
+# trying to test to see if assigning inherited trait query params at a
+# different time would work
+def _set_params_test(data, attr_name, root, inherit=False, **kw):
+    params, inherit_objs, parent_params, root_params = [], [], [], []
+
+    unparsed = __map_parsed_str(attr_name)
+    param_class = _map_param_unparsed_str_obj(unparsed)
+
+    _params = _get_attribute(unparsed, kw.get("method"), data)
+
+    params = _create_base_param_obj(_params, param_class, root.config,
+                                    root.errors)
+
+    if params is None:
+        params = []
+
+    if inherit:
+        inherit_objs = _get_inherited_attribute(attr_name, root,
+                                                kw.get("type"),
+                                                kw.get("method"),
+                                                kw.get("traits"))
+
+    if kw.get("parent"):
+        parent_params = getattr(kw.get("parent"), attr_name, [])
+    if root:
+        root_params = getattr(root, attr_name, [])
+
+    to_clean = (params, inherit_objs, parent_params, root_params)
+    return __remove_duplicates(to_clean)
 
 
 #####

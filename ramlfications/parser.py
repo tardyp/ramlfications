@@ -4,6 +4,9 @@
 from __future__ import absolute_import, division, print_function
 
 
+import cProfile
+import time
+
 import copy
 import re
 
@@ -27,10 +30,42 @@ from ._utils.parser_utils import (
     _create_base_param_obj, _get_attribute, get_inherited,
     _get_data_union, _get_inherited_item, _get_res_type_attribute,
     _get_inherited_attribute, _remove_duplicates, _preserve_uri_order,
-    _parse_assigned_trait_dicts, _set_param_type_object, _set_params
+    _parse_assigned_trait_dicts, _set_param_type_object, _set_params,
+    _set_params_test
 )
 
 __all__ = ["parse_raml"]
+
+
+def timeit(f):
+    def func_timer(*args, **kwargs):
+        start = time.time()
+        result = f(*args, **kwargs)
+        end = time.time()
+        print(f.__name__, 'took', end - start, 'time')
+        return result
+    return func_timer
+
+
+global counter
+counter = 0
+
+
+def countit(f):
+    def func_count(*args, **kwargs):
+        global counter
+        counter += 1
+        return f(*args, **kwargs)
+    return func_count
+
+
+# def profileit(f):
+#     def func_profile(*args, **kwargs):
+#         result = f(*args, **kwargs)
+#         pr.disable()
+#         pr.dumpstats(f.func_name)
+#         return result
+#     return func_profile
 
 
 def parse_raml(loaded_raml, config):
@@ -41,21 +76,43 @@ def parse_raml(loaded_raml, config):
     :returns: :py:class:`.raml.RootNode` object.
     :raises: :py:class:`.errors.InvalidRAMLError` when RAML file is invalid
     """
+    pr = cProfile.Profile()
 
     validate = str(_get(config, "validate")).lower() == 'true'
 
     # Postpone validating the root node until the end; otherwise,
     # we end up with duplicate validation exceptions.
     attr.set_run_validators(False)
+
+    pr.enable()
     root = create_root(loaded_raml, config)
+    pr.disable()
+    pr.dump_stats('create_root')
     attr.set_run_validators(validate)
 
+    pr.enable()
     root.security_schemes = create_sec_schemes(root.raml_obj, root)
-    root.traits = create_traits(root.raml_obj, root)
-    root.resource_types = create_resource_types(root.raml_obj, root)
+    pr.disable()
+    pr.dump_stats('create_sec_schemes')
 
-    root.resources = create_resources(root.raml_obj, [], root,
+    pr.enable()
+    root.traits = create_traits(root.raml_obj, root)
+    pr.disable()
+    pr.dump_stats('create_traits')
+
+    pr.enable()
+    root.resource_types = create_resource_types(root.raml_obj, root)
+    pr.disable()
+    pr.dump_stats('create_resource_types')
+
+    pr.enable()
+    root_ = copy.deepcopy(root)
+    root.resources = create_resources(root.raml_obj, [], root_,
                                       parent=None)
+    pr.disable()
+    pr.dump_stats('create_resources')
+
+    # print("counted {0} of create nodes function".format(counter))
 
     if validate:
         attr.validate(root)  # need to validate again for root node
@@ -631,6 +688,7 @@ def create_resources(node, resources, root, parent):
     return resources
 
 
+@countit
 def create_node(name, raw_data, method, parent, root):
     """
     Create a Resource Node object.
@@ -698,9 +756,10 @@ def create_node(name, raw_data, method, parent, root):
                                           root.config,
                                           root.errors,
                                           method=method)
-        if _headers is None:
-            return header_objs or None
-        return _remove_duplicates(header_objs, _headers)
+        # if _headers is None:
+            # return header_objs or None
+        # return _remove_duplicates(header_objs, _headers)
+        return _headers or None
 
     def body():
         """Set resource's supported request/response body."""
@@ -709,9 +768,10 @@ def create_node(name, raw_data, method, parent, root):
                                                 method, assigned_traits)
 
         _body_objs = create_body_objects(bodies, root)
-        if _body_objs == []:
-            return body_objects or None
-        return _remove_duplicates(body_objects, _body_objs)
+        # if _body_objs == []:
+            # return body_objects or None
+        # return _remove_duplicates(body_objects, _body_objs)
+        return _body_objs or None
 
     def responses():
         """Set resource's expected responses."""
@@ -768,7 +828,8 @@ def create_node(name, raw_data, method, parent, root):
             return body_list or None
 
         resps = _get_attribute("responses", method, raw_data)
-        resp_objs = _get_inherited_attribute("responses", root, res_type, method, assigned_traits)
+        # resp_objs = _get_inherited_attribute("responses", root, res_type, method, assigned_traits)
+        resp_objs = []
         resp_codes = [r.code for r in resp_objs]
         for k, v in list(iteritems(resps)):
             if k in resp_codes:
@@ -835,9 +896,9 @@ def create_node(name, raw_data, method, parent, root):
                                    root.errors, declared)
 
     def query_params():
-        kw = dict(type=assigned_type, traits=assigned_traits, method=method)
-        return _set_params(raw_data, "query_params", root,
-                                    inherit=True, **kw)
+        kw = dict(method=method)
+        return _set_params_test(raw_data, "query_params", root,
+                                inherit=False, **kw)
 
     def form_params():
         """Set resource's form parameters."""
@@ -904,11 +965,8 @@ def create_node(name, raw_data, method, parent, root):
                 for trait in assigned:
                     obj = [t for t in root.traits if t.name == trait]
                     if obj:
-                        trait_objs.append(obj[0])
-                # such a hack - current implementation of replacing/substituting
-                # `<<parameters>>` would otherwise overwrite the root traits.
-                # damn python object referencing.
-                root.traits = copy.deepcopy(root.traits)
+                        obj = copy.deepcopy(obj[0])
+                        trait_objs.append(obj)
                 return trait_objs or None
 
     # TODO: wow this function sucks.
@@ -927,12 +985,14 @@ def create_node(name, raw_data, method, parent, root):
         if res_type and root.resource_types:
             res_types = root.resource_types
             type_obj = [r for r in res_types if r.name == assigned_type]
+            type_obj = [r for r in type_obj if r.method == method]
             # such a hack - current implementation of replacing/substituting
             # `<<parameters>>` would otherwise overwrite the root traits.
             # damn python object referencing.
-            root.resource_types = copy.deepcopy(root.resource_types)
+            # root.resource_types = copy.copy(root.resource_types)
             if type_obj:
-                return type_obj[0]
+                obj = copy.deepcopy(type_obj[0])
+                return obj
 
     def secured_by():
         """
@@ -997,8 +1057,10 @@ def create_node(name, raw_data, method, parent, root):
 
     if res_type:
         # correct inheritance (issue #23)
-        node._inherit_type()
         node._parse_resource_type_parameters()
+        node._inherit_type_test()
+        node._inherit_type()
     if res_is:
         node._parse_trait_parameters()
+        node._inherit_trait_objects()
     return node
