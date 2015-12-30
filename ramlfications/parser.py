@@ -84,35 +84,14 @@ def parse_raml(loaded_raml, config):
     # we end up with duplicate validation exceptions.
     attr.set_run_validators(False)
 
-    pr.enable()
     root = create_root(loaded_raml, config)
-    pr.disable()
-    pr.dump_stats('create_root')
     attr.set_run_validators(validate)
 
-    pr.enable()
     root.security_schemes = create_sec_schemes(root.raml_obj, root)
-    pr.disable()
-    pr.dump_stats('create_sec_schemes')
-
-    pr.enable()
     root.traits = create_traits(root.raml_obj, root)
-    pr.disable()
-    pr.dump_stats('create_traits')
-
-    pr.enable()
     root.resource_types = create_resource_types(root.raml_obj, root)
-    pr.disable()
-    pr.dump_stats('create_resource_types')
-
-    pr.enable()
-    root_ = copy.deepcopy(root)
-    root.resources = create_resources(root.raml_obj, [], root_,
+    root.resources = create_resources(root.raml_obj, [], root,
                                       parent=None)
-    pr.disable()
-    pr.dump_stats('create_resources')
-
-    # print("counted {0} of create nodes function".format(counter))
 
     if validate:
         attr.validate(root)  # need to validate again for root node
@@ -828,8 +807,8 @@ def create_node(name, raw_data, method, parent, root):
             return body_list or None
 
         resps = _get_attribute("responses", method, raw_data)
-        # resp_objs = _get_inherited_attribute("responses", root, res_type, method, assigned_traits)
-        resp_objs = []
+        resp_objs = _get_inherited_attribute("responses", root, res_type, method, assigned_traits)
+        # resp_objs = []
         resp_codes = [r.code for r in resp_objs]
         for k, v in list(iteritems(resps)):
             if k in resp_codes:

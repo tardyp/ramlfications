@@ -230,7 +230,9 @@ class ResourceNode(BaseNode):
             except AttributeError:
                 # this won't be valid when validating
                 return
+
             if resource_prop and inherited_prop:
+
                 for r in resource_prop:
                     r._inherit_type_properties(inherited_prop)
 
@@ -251,11 +253,10 @@ class ResourceNode(BaseNode):
 
                     else:
                         res_prop.append(inherited_copy)
-            # print("[RAML] self.name {0}".format(self.name))
-            # print("[RAML] self.resource_type: {0}".format(self.resource_type))
-            # print("[RAML] self.resource_type q_params: {0}".format(self.resource_type.query_params))
 
     def _inherit_trait_objects(self):
+        if not self.traits:
+            return  # this should be invalid
         for t in self.traits:
             for p in RESOURCE_PROPERTIES:
                 inherited_prop = getattr(t, p, False)

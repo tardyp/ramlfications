@@ -317,14 +317,13 @@ class Response(object):
         return None
 
     def _inherit_type_properties(self, inherited_param):
-        pu._inherit_type_properties(self, inherited_param, NAMED_PARAMS)
+        params = NAMED_PARAMS + ["headers", "body"]
+        pu._inherit_type_properties(self, inherited_param, params)
         recurse_objs = ["headers", "body"]
         for r in recurse_objs:
             r_objs = getattr(self, r)
-            print("[PARAMETERS] inherited: {0}".format(inherited_param))
             if r_objs:
                 for o in r_objs:
-                    print("[PARAMETERS]: o: {0}".format(o))
                     o._inherit_type_properties(inherited_param)
 
     def _substitute_parameters(self, obj, name, value):
