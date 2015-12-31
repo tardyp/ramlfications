@@ -59,6 +59,9 @@ def create_param_objs(data, method, root, param_type, resource_types=False):
 
 
 def create_body(mime_type, data, root):
+    """
+    Create a ``.parameters.Body`` object.
+    """
     raw = {mime_type: data}
     return Body(
         mime_type=mime_type,
@@ -73,6 +76,9 @@ def create_body(mime_type, data, root):
 
 
 def create_bodies(data, method, root, resource_types=False):
+    """
+    Returns a list of ``.parameters.Body`` objects.
+    """
     bodies = _get_attribute("body", method, data)
     if resource_types:
         bodies = _get_inherited_item(bodies, "body", resource_types,
@@ -112,7 +118,10 @@ def create_response(code, data, root, method, inherited_resp=None):
 
 
 def _create_response_headers(data, method, root):
-    """Create response header objects."""
+    """
+    Create ``.parameters.Header`` objects for a ``.parameters.Response``
+    object.
+    """
     headers = _get(data, "headers", default={})
 
     header_objects = _create_base_param_obj(headers, Header, root.config,
@@ -121,7 +130,10 @@ def _create_response_headers(data, method, root):
 
 
 def _create_response_body(data, root):
-    """Create response body objects."""
+    """
+    Create ``.parameters.Body`` objects for a ``.parameters.Response``
+    object.
+    """
     body = _get(data, "body", default={})
     body_list = []
     no_mime_body_data = {}
@@ -144,6 +156,9 @@ def _create_response_body(data, root):
 
 
 def create_responses(data, root, method, resource_types=None):
+    """
+    Returns a list of ``.parameters.Response`` objects.
+    """
     response_objects = []
     responses = _get_attribute("responses", method, data)
     if resource_types:
@@ -158,6 +173,7 @@ def create_responses(data, root, method, resource_types=None):
 
 
 def create_security_scheme(scheme, data, root):
+    """Create a ``.parameters.SecurityScheme`` object."""
     return SecurityScheme(
         name=scheme,
         raw=data,
@@ -171,6 +187,9 @@ def create_security_scheme(scheme, data, root):
 
 
 def create_security_schemes(secured_by, root):
+    """
+    Returns a list of ``.parameters.SecurityScheme`` objects.
+    """
     secured_objects = []
     for item in secured_by:
         assigned_scheme = _get_scheme(item, root)
