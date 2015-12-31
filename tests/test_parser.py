@@ -1160,9 +1160,9 @@ def test_resource_responses(resources):
     assert schema == {"name": "the search body"}
 
     schema = res.responses[0].body[1].schema
-    assert schema == {}
+    assert not schema
     example = res.responses[0].body[1].example
-    assert example == {}
+    assert not example
 
     res = resources[19]
     headers = [h.name for h in res.responses[0].headers]

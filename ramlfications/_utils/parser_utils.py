@@ -5,7 +5,7 @@ from __future__ import absolute_import, division, print_function
 
 import re
 
-from six import itervalues, iterkeys, iteritems
+from six import iterkeys, iteritems
 
 try:
     from collections import OrderedDict
@@ -14,9 +14,8 @@ except ImportError:  # NOCOV
 
 from ramlfications.parameters import (
     Header, Body, Response, URIParameter, QueryParameter,
-    FormParameter, SecurityScheme
+    FormParameter
 )
-from ramlfications.utils import load_schema
 
 from .common_utils import _get
 
@@ -29,51 +28,17 @@ from .common_utils import _get
 def _get_scheme(item, root):
     schemes = root.raw.get("securitySchemes", [])
     for s in schemes:
-        if isinstance(item, str):
-            if item == list(iterkeys(s))[0]:
-                return s
-        elif isinstance(item, dict):
-            if list(iterkeys(item))[0] == list(iterkeys(s))[0]:
-                return s
-
-
-def security_schemes(secured, root):
-    """Set resource's assigned security scheme objects."""
-    if secured:
-        secured_objs = []
-        for item in secured:
-            assigned_scheme = _get_scheme(item, root)
-            if assigned_scheme:
-                raw_data = list(itervalues(assigned_scheme))[0]
-                scheme = SecurityScheme(
-                    name=list(iterkeys(assigned_scheme))[0],
-                    raw=raw_data,
-                    type=raw_data.get("type"),
-                    described_by=raw_data.get("describedBy"),
-                    desc=raw_data.get("description"),
-                    settings=raw_data.get("settings"),
-                    config=root.config,
-                    errors=root.errors
-                )
-                secured_objs.append(scheme)
-        return secured_objs
-    return None
+        if item == list(iterkeys(s))[0]:
+            return s
 
 
 def create_body_objects(data, root):
+    from ramlfications.create_parameters import create_body
     ret_objs = []
     for k, v in list(iteritems(data)):
         if v is None:
             continue
-        body = Body(
-            mime_type=k,
-            raw={k: v},
-            schema=load_schema(_get(v, "schema")),
-            example=load_schema(_get(v, "example")),
-            form_params=_get(v, "formParameters"),
-            config=root.config,
-            errors=root.errors
-        )
+        body = create_body(k, v, root)
         ret_objs.append(body)
     return ret_objs
 
@@ -403,7 +368,7 @@ def __get_method(attribute, method, raw_data):
 
 def __get_resource(attribute, raw_data):
     """Returns ``attribute`` defined at the resource level, or ``None``."""
-    return raw_data.get(attribute, {})
+    return _get(raw_data, attribute, {})
 # </---[._get_attribute helpers]--->
 
 
@@ -414,7 +379,10 @@ def _get_attribute(attribute, method, raw_data):
     ``headers``, for both the resource-level data as well as
     method-level data.
     """
-    method_level = __get_method(attribute, method, raw_data)
+    if method:
+        method_level = __get_method(attribute, method, raw_data)
+    else:
+        method_level = {}
     resource_level = __get_resource(attribute, raw_data)
     return OrderedDict(list(iteritems(method_level)) +
                        list(iteritems(resource_level)))
@@ -598,17 +566,21 @@ def _get_data_union(child, parent):
 
 
 #####
-# Traits
+# Traits & Security Schemes
 #####
-# return list of traits if an assigned trait is a dictionary
-def _parse_assigned_trait_dicts(traits):
-    if not traits:
-        return []
-    trait_names = []
-    for t in traits:
-        if isinstance(t, str):
-            trait_names.append(t)
-        elif isinstance(t, dict):
-            name = list(iterkeys(t))[0]
-            trait_names.append(name)
-    return trait_names
+# return list of traits/schemes if an assigned trait/secured_by is a dictionary
+def _parse_assigned_dicts(items):
+    if not items:
+        return
+    if isinstance(items, dict):
+        return list(iterkeys(items))[0]
+    if isinstance(items, list):
+        item_names = []
+        for i in items:
+            if isinstance(i, str):
+                item_names.append(i)
+            elif isinstance(i, dict):
+                name = list(iterkeys(i))[0]
+                item_names.append(name)
+        return item_names
+    return items
