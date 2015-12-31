@@ -16,7 +16,6 @@ from ramlfications.parameters import (
     Header, Body, Response, URIParameter, QueryParameter,
     FormParameter, SecurityScheme
 )
-from ramlfications.utils import load_schema
 
 from .common_utils import _get
 
@@ -61,19 +60,12 @@ def security_schemes(secured, root):
 
 
 def create_body_objects(data, root):
+    from ramlfications.create_parameters import create_body
     ret_objs = []
     for k, v in list(iteritems(data)):
         if v is None:
             continue
-        body = Body(
-            mime_type=k,
-            raw={k: v},
-            schema=load_schema(_get(v, "schema")),
-            example=load_schema(_get(v, "example")),
-            form_params=_get(v, "formParameters"),
-            config=root.config,
-            errors=root.errors
-        )
+        body = create_body(k, v, root)
         ret_objs.append(body)
     return ret_objs
 
@@ -414,7 +406,10 @@ def _get_attribute(attribute, method, raw_data):
     ``headers``, for both the resource-level data as well as
     method-level data.
     """
-    method_level = __get_method(attribute, method, raw_data)
+    if method:
+        method_level = __get_method(attribute, method, raw_data)
+    else:
+        method_level = {}
     resource_level = __get_resource(attribute, raw_data)
     return OrderedDict(list(iteritems(method_level)) +
                        list(iteritems(resource_level)))
