@@ -35,58 +35,6 @@ def _get_scheme(item, root):
 #####
 # General Helper Functions
 #####
-# preserve order of URI and Base URI parameters
-# used for RootNode, ResourceNode
-def _preserve_uri_order(path, param_objs, config, errors, declared=[]):
-    # if this is hit, RAML shouldn't be valid anyways.
-    if isinstance(path, list):
-        path = path[0]
-
-    sorted_params = []
-    pattern = "\{(.*?)\}"
-    params = re.findall(pattern, path)
-    if not param_objs:
-        param_objs = []
-    # if there are URI parameters in the path but were not declared
-    # inline, we should create them.
-    # TODO: Probably shouldn't do it in this function, though...
-    if len(params) > len(param_objs):
-        if len(param_objs) > 0:
-            param_names = [p.name for p in param_objs]
-            missing = [p for p in params if p not in param_names]
-        else:
-            missing = params[::]
-        # exclude any (base)uri params if already declared
-        missing = [p for p in missing if p not in declared]
-        for m in missing:
-            # no need to create a URI param for version
-            if m == "version":
-                continue
-            data = {"type": "string"}
-            _param = URIParameter(name=m,
-                                  raw={m: data},
-                                  required=True,
-                                  display_name=m,
-                                  desc=_get(data, "description"),
-                                  min_length=_get(data, "minLength"),
-                                  max_length=_get(data, "maxLength"),
-                                  minimum=_get(data, "minimum"),
-                                  maximum=_get(data, "maximum"),
-                                  default=_get(data, "default"),
-                                  enum=_get(data, "enum"),
-                                  example=_get(data, "example"),
-                                  repeat=_get(data, "repeat", False),
-                                  pattern=_get(data, "pattern"),
-                                  type=_get(data, "type", "string"),
-                                  config=config,
-                                  errors=errors)
-            param_objs.append(_param)
-    for p in params:
-        _param = [i for i in param_objs if i.name == p]
-        if _param:
-            sorted_params.append(_param[0])
-    return sorted_params or None
-
 
 def _lookup_resource_type(assigned, root):
     """
@@ -178,46 +126,22 @@ def _create_base_param_obj(attribute_data, param_obj, config, errors, **kw):
     return objects or None
 
 
-# helper func for below
-# used to create URI params
-def __find_set_object(params, name, root, method=None):
-    param_obj = _map_param_unparsed_str_obj(name)
-    return _create_base_param_obj(params, param_obj, root.config, root.errors,
-                                  method=method)
-
-
-# used to create URI params
-def _set_param_trait_object(param_data, param_name, root):
-    params = _get(param_data, param_name, {})
-    return __find_set_object(params, param_name, root)
-
-
-# TODO: can I clean up/get rid of this? only used once here, and in
-#       create_parameters for URI params
-def __get_inherited_type_params(data, attribute, params, resource_types):
-    inherited = __get_inherited_type_data(data, resource_types)
-    inherited_params = _get(inherited, attribute, {})
-
-    return dict(list(iteritems(params)) +
-                list(iteritems(inherited_params)))
-
-
 # TODO: can I clean up/get rid of this? only used twice here
-def __get_inherited_type_data(data, resource_types):
-    inherited = __get_inherited_resource(data.get("type"), resource_types)
+def _x_get_inherited_type_data(data, resource_types):
+    inherited = _x_get_inherited_resource(data.get("type"), resource_types)
     return _get(inherited, data.get("type"))
 
 
 # just parsing raw data, no objects
 # TODO: can I clean up/get rid of this? only used once here
-def __get_inherited_resource(res_name, resource_types):
+def _x_get_inherited_resource(res_name, resource_types):
     for resource in resource_types:
         if res_name == list(iterkeys(resource))[0]:
             return resource
 
 
 def _get_inherited_item(current_items, item_name, res_types, method, data):
-    resource = __get_inherited_type_data(data, res_types)
+    resource = _x_get_inherited_type_data(data, res_types)
     res_data = _get(resource, method, {})
 
     method_ = _get(resource, method, {})
@@ -234,77 +158,6 @@ def _get_res_type_attribute(res_data, method_data, item, default={}):
     method_level = _get(method_data, item, default)
     resource_level = _get(res_data, item, default)
     return method_level, resource_level
-
-
-#####
-# Set Query, Form, URI params for Resource Nodes
-#####
-# <--[query, base uri, form]-->
-# TODO: can I clean up/get rid of this? only used once here
-def __check_if_exists(param, ret_list):
-    if isinstance(param, Body):
-        param_name_list = [p.mime_type for p in ret_list]
-        if param.mime_type not in param_name_list:
-            ret_list.append(param)
-            param_name_list.append(param.mime_type)
-
-    else:
-        param_name_list = [p.name for p in ret_list]
-        if param.name not in param_name_list:
-            ret_list.append(param)
-            param_name_list.append(param.name)
-    return ret_list
-
-
-# TODO: refactor - this ain't pretty
-def __remove_duplicates(to_clean):
-    # order: resource, inherited, parent, root
-    ret = []
-
-    for param_set in to_clean:
-        if param_set:
-            for p in param_set:
-                ret = __check_if_exists(p, ret)
-    return ret or None
-
-
-def __map_parsed_str(parsed):
-    name = parsed.split("_")[:-1]
-    name.append("parameters")
-    name = [n.capitalize() for n in name]
-    name = "".join(name)
-    return name[0].lower() + name[1:]
-
-
-# TODO: can I clean up/get rid of this? only used when setting URI params
-def _set_params(data, attr_name, root, inherit=False, **kw):
-    params, inherit_objs, parent_params, root_params = [], [], [], []
-
-    unparsed = __map_parsed_str(attr_name)
-    param_class = _map_param_unparsed_str_obj(unparsed)
-
-    _params = _get_attribute(unparsed, kw.get("method"), data)
-
-    params = _create_base_param_obj(_params, param_class, root.config,
-                                    root.errors)
-
-    if params is None:
-        params = []
-
-    if inherit:
-        inherit_objs = _get_inherited_attribute(attr_name, root,
-                                                kw.get("type"),
-                                                kw.get("method"),
-                                                kw.get("traits"))
-
-    if kw.get("parent"):
-        parent_params = getattr(kw.get("parent"), attr_name, [])
-    if root:
-        root_params = getattr(root, attr_name, [])
-
-    to_clean = (params, inherit_objs, parent_params, root_params)
-    return __remove_duplicates(to_clean)
-# </--[query, base uri, form]-->
 
 
 #####
@@ -339,12 +192,6 @@ def _get_attribute(attribute, method, raw_data):
     resource_level = __get_resource(attribute, raw_data)
     return OrderedDict(list(iteritems(method_level)) +
                        list(iteritems(resource_level)))
-
-
-def _get_inherited_attribute(attribute, root, type_, method, is_):
-    type_objects = __get_resource_type(attribute, root, type_, method)
-    trait_objects = __get_trait(attribute, root, is_)
-    return type_objects + trait_objects
 
 
 def __get_resource_type(attribute, root, type_, method):
@@ -394,6 +241,7 @@ def __map_inheritance(nodetype):
 
 
 def __map_attr(attribute):
+    """Map RAML attr name to ramlfications attr name"""
     return {
         "mediaType": "media_type",
         "protocols": "protocols",
@@ -404,7 +252,8 @@ def __map_attr(attribute):
         "baseUriParameters": "base_uri_params",
         "queryParameters": "query_params",
         "formParameters": "form_params",
-        "description": "description"
+        "description": "description",
+        "securedBy": "secured_by",
     }[attribute]
 
 
@@ -450,7 +299,8 @@ def __root(item, **kwargs):
     return getattr(root, item, None)
 
 
-# only used by two functions in parser.py: media_type & protocols
+# Resources to iterate through objects (types, traits, etc) to
+# inherit data from
 def get_inherited(item, inherit_from=[], **kwargs):
     for nodetype in inherit_from:
         inherit_func = __map_inheritance(nodetype)

@@ -13,7 +13,7 @@ from six import iteritems, iterkeys, itervalues
 
 from .errors import InvalidRAMLError
 from .parameters import (
-    Documentation, URIParameter, SecurityScheme
+    Documentation, SecurityScheme
 )
 from .raml import RootNode, ResourceNode, ResourceTypeNode, TraitNode
 from .utils import load_schema
@@ -21,16 +21,15 @@ from .utils import load_schema
 # Private utility functions
 from ._utils.common_utils import _get
 from ._utils.parser_utils import (
-    _lookup_resource_type, _set_param_trait_object,
-    _create_base_param_obj, _get_attribute, get_inherited, _get_data_union,
-    _get_res_type_attribute, _get_inherited_attribute,
-    _set_params, _parse_assigned_dicts
+    _lookup_resource_type, _get_attribute, get_inherited, _get_data_union,
+    _get_res_type_attribute,
+    _parse_assigned_dicts
 )
 
 from .create_parameters import (
     create_response, create_bodies, create_responses,
-    create_security_schemes, create_uri_params, create_param_objs,
-    create_uri_params_node, create_base_uri_params
+    create_security_schemes, create_uri_params_res_types, create_param_objs,
+    create_uri_params, _set_params, _get_inherited_objects
 )
 
 
@@ -93,17 +92,15 @@ def create_root(raml, config):
         return base_uri
 
     def base_uri_params():
-        data = _get(raml, "baseUriParameters", {})
-        params = _create_base_param_obj(data, URIParameter, config, errors)
         uri = _get(raml, "baseUri", "")
-        return create_base_uri_params(uri, params, config, errors, raml=raml)
+        return create_param_objs(raml, None, config, errors,
+                                 "baseUriParameters", uri=uri, raml=raml)
 
     def uri_params():
-        data = _get(raml, "uriParameters", {})
-        params = _create_base_param_obj(data, URIParameter, config, errors)
         uri = _get(raml, "baseUri", "")
         base = base_uri_params()
-        return create_uri_params_node(uri, params, config, errors, base)
+        return create_param_objs(raml, None, config, errors, "uriParameters",
+                                 uri=uri, base=base)
 
     def docs():
         d = _get(raml, "documentation", [])
@@ -162,7 +159,8 @@ def create_sec_schemes(raml_data, root):
         }[item]
 
     def headers(header_data):
-        return create_param_objs(header_data, method, root, "headers")
+        return create_param_objs(header_data, method, root.config, root.errors,
+                                 "headers")
 
     def body(body_data):
         return create_bodies(body_data, method, root)
@@ -171,13 +169,16 @@ def create_sec_schemes(raml_data, root):
         return create_responses(resp_data, root, method)
 
     def query_params(param_data):
-        return create_param_objs(param_data, method, root, "queryParameters")
+        return create_param_objs(param_data, method, root.config, root.errors,
+                                 "queryParameters")
 
     def uri_params(param_data):
-        return _set_param_trait_object(param_data, "uriParameters", root)
+        return create_param_objs(param_data, None, root.config, root.errors,
+                                 "uriParameters")
 
     def form_params(param_data):
-        return create_param_objs(param_data, method, root, "formParameters")
+        return create_param_objs(param_data, method, root.config, root.errors,
+                                 "formParameters")
 
     def usage(desc_by_data):
         return _get(desc_by_data, "usage")
@@ -237,19 +238,24 @@ def create_traits(raml_data, root):
     :returns: list of :py:class:`.raml.TraitNode` objects
     """
     def query_params():
-        return create_param_objs(data, method, root, "queryParameters")
+        return create_param_objs(data, method, root.config, root.errors,
+                                 "queryParameters")
 
     def uri_params():
-        return _set_param_trait_object(data, "uriParameters", root)
+        return create_param_objs(data, None, root.config, root.errors,
+                                 "uriParameters")
 
     def form_params():
-        return create_param_objs(data, method, root, "formParameters")
+        return create_param_objs(data, method, root.config, root.errors,
+                                 "formParameters")
 
     def base_uri_params():
-        return create_param_objs(data, method, root, "baseUriParameters")
+        return create_param_objs(data, method, root.config, root.errors,
+                                 "baseUriParameters")
 
     def headers():
-        return create_param_objs(data, method, root, "headers")
+        return create_param_objs(data, method, root.config, root.errors,
+                                 "headers")
 
     def body():
         return create_bodies(data, method, root)
@@ -305,7 +311,8 @@ def create_resource_types(raml_data, root):
         inherit = False
         if _get(v, "type"):
             inherit = resource_types
-        return create_param_objs(data, method(meth), root, "headers", inherit)
+        return create_param_objs(data, method(meth), root.config, root.errors,
+                                 "headers", inherit)
 
     def body(data):
         inherit = False
@@ -325,19 +332,19 @@ def create_resource_types(raml_data, root):
         inherit = False
         if _get(v, "type"):
             inherit = resource_types
-        return create_uri_params(data, v, method, root, inherit)
+        return create_uri_params_res_types(data, v, method, root, inherit)
 
     def base_uri_params(data):
-        return create_param_objs(data, method, root, "baseUriParameters",
-                                 inherit)
+        return create_param_objs(data, method, root.config, root.errors,
+                                 "baseUriParameters", inherit)
 
     def query_params(data):
-        return create_param_objs(data, method, root, "queryParameters",
-                                 inherit)
+        return create_param_objs(data, method, root.config, root.errors,
+                                 "queryParameters", inherit)
 
     def form_params(data):
-        return create_param_objs(data, method, root, "formParameters",
-                                 inherit)
+        return create_param_objs(data, method, root.config, root.errors,
+                                 "formParameters", inherit)
 
     def description():
         # prefer the resourceType method description
@@ -599,7 +606,8 @@ def create_node(name, raw_data, method, parent, root):
 
     def headers():
         """Set resource's supported headers."""
-        return create_param_objs(raw_data, method, root, "headers")
+        return create_param_objs(raw_data, method, root.config, root.errors,
+                                 "headers")
 
     def body():
         """Set resource's supported request/response body."""
@@ -608,8 +616,8 @@ def create_node(name, raw_data, method, parent, root):
     def responses():
         """Set resource's expected responses."""
         resps = _get_attribute("responses", method, raw_data)
-        resp_objs = _get_inherited_attribute("responses", root, res_type,
-                                             method, assigned_traits)
+        resp_objs = _get_inherited_objects("responses", root, res_type,
+                                           method, assigned_traits)
         resp_codes = [r.code for r in resp_objs]
         for k, v in list(iteritems(resps)):
             if k in resp_codes:
@@ -630,23 +638,25 @@ def create_node(name, raw_data, method, parent, root):
                   method=method, parent=parent)
         params = _set_params(raw_data, "uri_params", root, inherit=True, **kw)
         uri = absolute_uri()
-        return create_uri_params_node(uri, params, root.config, root.errors,
-                                      res_base_uri_params)
+        return create_uri_params(uri, params, root.config, root.errors,
+                                 base=res_base_uri_params)
 
     def base_uri_params():
         """Set resource's base URI parameters."""
         kw = dict(type=assigned_type, traits=assigned_traits, method=method)
         params = _set_params(raw_data, "base_uri_params", root,
                              inherit=True, **kw)
-        return create_base_uri_params(root.base_uri, params, root.config,
-                                      root.errors, root=root)
+        return create_uri_params(root.base_uri, params, root.config,
+                                 root.errors, root=root)
 
     def query_params():
-        return create_param_objs(raw_data, method, root, "queryParameters")
+        return create_param_objs(raw_data, method, root.config, root.errors,
+                                 "queryParameters")
 
     def form_params():
         """Set resource's form parameters."""
-        return create_param_objs(raw_data, method, root, "formParameters")
+        return create_param_objs(raw_data, method, root.config, root.errors,
+                                 "formParameters")
 
     def media_type_():
         """Set resource's supported media types."""
@@ -685,16 +695,17 @@ def create_node(name, raw_data, method, parent, root):
     def is_():
         """Set resource's assigned trait names."""
         is_list = []
-        res_level = _get(raw_data, "is")
-        if res_level:
-            assert isinstance(res_level, list), "Error parsing trait"
+        res_level = _get(raw_data, "is", [])
+        if isinstance(res_level, list):
             is_list.extend(res_level)
+        else:
+            is_list.append(res_level)
         method_level = _get(raw_data, method, {})
-        if method_level:
-            method_level = _get(method_level, "is")
-            if method_level:
-                assert isinstance(method_level, list), "Error parsing trait"
-                is_list.extend(method_level)
+        method_level = _get(method_level, "is", [])
+        if isinstance(method_level, list):
+            is_list.extend(method_level)
+        else:
+            is_list.append(method_level)
         return is_list or None
 
     def traits():
@@ -737,18 +748,13 @@ def create_node(name, raw_data, method, parent, root):
         """
         Set resource's assigned security scheme names and related paramters.
         """
-        if method is not None:
-            method_level = _get(raw_data, method, {})
-            if method_level:
-                secured_by = _get(method_level, "securedBy")
-                if secured_by:
-                    return secured_by
-        resource_level = _get(raw_data, "securedBy")
-        if resource_level:
-            return resource_level
-        root_level = root.secured_by
-        if root_level:
-            return root_level
+        kw = dict(
+            method=method,
+            data=raw_data,
+            root=root,
+        )
+        objects_to_inherit = ["method", "resource", "root"]
+        return get_inherited("securedBy", objects_to_inherit, **kw)
 
     def security_schemes_():
         """Set resource's assigned security scheme objects."""

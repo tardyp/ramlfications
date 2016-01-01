@@ -192,10 +192,11 @@ def test_invalid_media_type():
 def test_invalid_trait_obj():
     raml = load_raml("trait-unsupported-obj.raml")
     config = load_config("valid-config.ini")
-    with pytest.raises(AssertionError) as e:
+    with raises as e:
         validate(raml, config)
-    msg = ("Error parsing trait",)
-    assert msg == e.value.args
+    msg = ("'12' needs to be a string referring to a trait, or a "
+           "dictionary mapping parameter values to a trait",)
+    assert _error_exists(e.value.errors, errors.InvalidResourceNodeError, msg)
 
 
 def test_traits_undefined():
@@ -222,10 +223,11 @@ def test_no_traits_defined():
 def test_unsupported_trait_type_str():
     raml = load_raml("trait-unsupported-type-str.raml")
     config = load_config("valid-config.ini")
-    with pytest.raises(AssertionError) as e:
+    with raises as e:
         validate(raml, config)
-    msg = ("Error parsing trait",)
-    assert msg == e.value.args
+    msg = ("Trait '12' is assigned to '/users/{user_id}/playlists' but is "
+           "not defined in the root of the API.",)
+    assert _error_exists(e.value.errors, errors.InvalidResourceNodeError, msg)
 
 
 def test_unsupported_trait_type_array_ints():

@@ -3,6 +3,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+import re
 
 from six import iteritems, itervalues, iterkeys
 
@@ -15,9 +16,8 @@ from .utils import load_schema
 
 from ._utils.common_utils import _get
 from ._utils.parser_utils import (
-    _create_base_param_obj, _remove_duplicates, _get_attribute,
+    _remove_duplicates, _get_attribute,
     _get_inherited_item, _get_scheme, _get_res_type_attribute,
-    __get_inherited_type_params, __find_set_object, _preserve_uri_order
 )
 
 #####
@@ -25,18 +25,42 @@ from ._utils.parser_utils import (
 #####
 
 
-# TODO: FIXME in order to use in parser.py
-def create_uri_params(data, raw_data, method, root, inherit=False):
-    m_data, r_data = _get_res_type_attribute(raw_data, data, "uriParameters")
-    # param_data = _get_attribute("uriParameters", method, raw_data)
-    param_data = dict(list(iteritems(m_data)) + list(iteritems(r_data)))
-    if inherit:
-        param_data = __get_inherited_type_params(raw_data, "uriParameters",
-                                                 param_data, inherit)
-    return __find_set_object(param_data, "uriParameters", root)
+#####
+# TODO: fixme clean me
+def create_uri_params(uri, params, conf, errs, base=None, root=None,
+                      raml=None):
+    declared = []
+    if base:
+        declared = [p.name for p in base]
+    if raml:
+        declared = _get(raml, "uriParameters", {})
+        declared = list(iterkeys(declared))
+    if root:
+        if root.uri_params:
+            declared = [p.name for p in root.uri_params]
+        if root.base_uri_params:
+            declared.extend([p.name for p in root.base_uri_params])
+    return __preserve_uri_order(uri, params, conf, errs, declared)
 
 
-def create_param_objs(data, method, root, param_type, resource_types=False):
+def _create_uri_params(uri, params, conf, errs, base=None, root=None,
+                       raml=None):
+    declared = []
+    if base:
+        declared = [p.name for p in base]
+    if raml:
+        declared = _get(raml, "uriParameters", {})
+        declared = list(iterkeys(declared))
+    if root:
+        if root.uri_params:
+            declared = [p.name for p in root.uri_params]
+        if root.base_uri_params:
+            declared.extend([p.name for p in root.base_uri_params])
+    return __preserve_uri_order(uri, params, conf, errs, declared)
+
+
+def create_param_objs(data, method, conf, errs, param_type, types=False,
+                      uri=False, base=None, root=None, raml=None):
     """
     General function to create ``.parameters`` objects. Returns a list of
     ``.parameters`` objects or ``None``.
@@ -45,17 +69,65 @@ def create_param_objs(data, method, root, param_type, resource_types=False):
     :param str method: method associated with object, if necessary
     :param root: RootNode of the API
     :param str param_type: string name of object
-    :param resource_types: a list of ``.raml.ResourceTypeNode`` to inherit \
+    :param types: a list of ``.raml.ResourceTypeNode`` to inherit \
         from, if any.
+    :param str uri: URI of the node, to preserve order of URI params
+    :param base: base UriParameter objects to preserve order of URI \
+        parameters and to create any that are not explicitly declared
+    :param root: RootNode object to preserve order of URI parameters and \
+        to create any that are not explicitly declared
+    :param raml: raw RAML data to preserve order of URI parameters and \
+        to create any that are not explicitly declared
     """
     params = _get_attribute(param_type, method, data)
-    if resource_types:
-        params = _get_inherited_item(params, param_type, resource_types,
+    if types:
+        params = _get_inherited_item(params, param_type, types,
                                      method, data)
     object_name = __map_object(param_type)
-    params = _create_base_param_obj(params, object_name, root.config,
-                                    root.errors, method=method)
-    return params or None
+    params = __create_base_param_obj(params, object_name, conf, errs,
+                                     method=method)
+    if not uri:
+        return params or None
+    return _create_uri_params(uri, params, conf, errs, base=base,
+                              root=root, raml=raml)
+
+
+# TODO: can I clean up/get rid of this? only used when setting URI params
+def _set_params(data, attr_name, root, inherit=False, **kw):
+    params, inherit_objs, parent_params, root_params = [], [], [], []
+
+    # base_uri_params -> baseUriParameters
+    unparsed = __map_parsed_str(attr_name)
+    # baseUriParameters -> URIParameter
+    param_class = __map_object(unparsed)
+
+    # baseUriParameters -> raw data on method & resource level
+    raw_data = _get_attribute(unparsed, kw.get("method"), data)
+
+    # create params based on raw data _params
+    params = __create_base_param_obj(raw_data, param_class, root.config,
+                                     root.errors)
+
+    if params is None:
+        params = []
+
+    if inherit:
+        # get inherited objects
+        inherit_objs = _get_inherited_objects(attr_name, root,
+                                              kw.get("type"),
+                                              kw.get("method"),
+                                              kw.get("traits"))
+
+    if kw.get("parent"):
+        # get parent objects
+        parent_params = getattr(kw.get("parent"), attr_name, [])
+    if root:
+        # get root objects
+        root_params = getattr(root, attr_name, [])
+
+    # remove duplicates
+    to_clean = (params, inherit_objs, parent_params, root_params)
+    return __remove_duplicates(to_clean)
 
 
 def create_body(mime_type, data, root):
@@ -124,8 +196,8 @@ def _create_response_headers(data, method, root):
     """
     headers = _get(data, "headers", default={})
 
-    header_objects = _create_base_param_obj(headers, Header, root.config,
-                                            root.errors, method=method)
+    header_objects = __create_base_param_obj(headers, Header, root.config,
+                                             root.errors, method=method)
     return header_objects or None
 
 
@@ -200,11 +272,143 @@ def create_security_schemes(secured_by, root):
     return secured_objects
 
 
-#####
+############################
+#
 # Private, helper functions
+#
+############################
+
+def __create_base_param_obj(attribute_data, param_obj, config, errors, **kw):
+    """Helper function to create a BaseParameter object"""
+    objects = []
+
+    for key, value in list(iteritems(attribute_data)):
+        if param_obj is URIParameter:
+            required = _get(value, "required", default=True)
+        else:
+            required = _get(value, "required", default=False)
+        kwargs = dict(
+            name=key,
+            raw={key: value},
+            desc=_get(value, "description"),
+            display_name=_get(value, "displayName", key),
+            min_length=_get(value, "minLength"),
+            max_length=_get(value, "maxLength"),
+            minimum=_get(value, "minimum"),
+            maximum=_get(value, "maximum"),
+            default=_get(value, "default"),
+            enum=_get(value, "enum"),
+            example=_get(value, "example"),
+            required=required,
+            repeat=_get(value, "repeat", False),
+            pattern=_get(value, "pattern"),
+            type=_get(value, "type", "string"),
+            config=config,
+            errors=errors
+        )
+        if param_obj is Header:
+            kwargs["method"] = _get(kw, "method")
+
+        item = param_obj(**kwargs)
+        objects.append(item)
+
+    return objects or None
+
+
+# TODO: can I clean up/get rid of this? only used once here
+def __check_if_exists(param, ret_list):
+    if isinstance(param, Body):
+        param_name_list = [p.mime_type for p in ret_list]
+        if param.mime_type not in param_name_list:
+            ret_list.append(param)
+            param_name_list.append(param.mime_type)
+
+    else:
+        param_name_list = [p.name for p in ret_list]
+        if param.name not in param_name_list:
+            ret_list.append(param)
+            param_name_list.append(param.name)
+    return ret_list
+
+
+# TODO: refactor - this ain't pretty
+def __remove_duplicates(to_clean):
+    # order: resource, inherited, parent, root
+    ret = []
+
+    for param_set in to_clean:
+        if param_set:
+            for p in param_set:
+                ret = __check_if_exists(p, ret)
+    return ret or None
+
+
+def __add_missing_uri_params(missing, param_objs, config, errors):
+    for m in missing:
+        # no need to create a URI param for version
+        # or should we?
+        if m == "version":
+            continue
+        data = {m: {"type", "string"}}
+        _param = __create_base_param_obj(data, URIParameter, config, errors)
+        param_objs.append(_param[0])
+    return param_objs
+
+
+# preserve order of URI and Base URI parameters
+# used for RootNode, ResourceNode
+def __preserve_uri_order(path, param_objs, config, errors, declared=[]):
+    # if this is hit, RAML shouldn't be valid anyways.
+    if isinstance(path, list):
+        path = path[0]
+
+    pattern = "\{(.*?)\}"
+    params = re.findall(pattern, path)
+    if not param_objs:
+        param_objs = []
+    # if there are URI parameters in the path but were not declared
+    # inline, we should create them.
+    # TODO: Probably shouldn't do it in this function, though...
+    if len(params) > len(param_objs):
+        if len(param_objs) > 0:
+            param_names = [p.name for p in param_objs]
+            missing = [p for p in params if p not in param_names]
+        else:
+            missing = params[::]
+        # exclude any (base)uri params if already declared
+        missing = [p for p in missing if p not in declared]
+        param_objs = __add_missing_uri_params(missing, param_objs,
+                                              config, errors)
+
+    sorted_params = []
+    for p in params:
+        _param = [i for i in param_objs if i.name == p]
+        if _param:
+            sorted_params.append(_param[0])
+    return sorted_params or None
+
+
 #####
+# Utility helper functions
+#####
+def __map_parsed_str(parsed):
+    """
+    Returns ``ramlfications`` attribute of an object to its raw string
+    name mirrored in RAML.
+
+    e.g. ``base_uri_params`` -> ``baseUriParameters``
+    """
+    name = parsed.split("_")[:-1]
+    name.append("parameters")
+    name = [n.capitalize() for n in name]
+    name = "".join(name)
+    return name[0].lower() + name[1:]
+
+
 def __map_object(param_type):
-    """Map raw string name to object"""
+    """
+    Map raw string name from RAML to mirrored ``ramlfications`` object
+    """
     return {
         "headers": Header,
         "body": Body,
@@ -216,21 +420,80 @@ def __map_object(param_type):
     }[param_type]
 
 
-def create_uri_params_node(uri, params, config, errors, base_params=None):
-    declared = []
-    if base_params:
-        declared = [p.name for p in base_params]
-    return _preserve_uri_order(uri, params, config, errors, declared)
+#####
+# Get objects for inheritance
+#####
 
 
-def create_base_uri_params(uri, params, config, errors, root=None, raml=None):
-    declared = []
-    if raml:
-        declared = _get(raml, "uriParameters", {})
-        declared = list(iterkeys(declared))
-    if root:
-        if root.uri_params:
-            declared = [p.name for p in root.uri_params]
-        if root.base_uri_params:
-            declared.extend([p.name for p in root.base_uri_params])
-    return _preserve_uri_order(uri, params, config, errors, declared)
+def _get_inherited_objects(attribute, root, type_, method, is_):
+    """
+    Returns a list of ``TraitNode`` and ``ResourceTypeNode`` objects
+    that is inherited if objects have an attribute (e.g. ``responses``)
+    that the child object shares.
+    """
+    type_objs, trait_objs = [], []
+    if type_ and root.resource_types:
+        type_objs = __get_resource_type(attribute, root, type_, method)
+    if is_ and root.traits:
+        trait_objs = __get_trait(attribute, root, is_)
+    return type_objs + trait_objs
+
+
+def __get_resource_type(attribute, root, type_, method):
+    """
+    Returns ``attribute`` (e.g. ``responses``) defined in the resource
+    type, or an empty ``list``.
+    """
+    types = root.resource_types
+    r_type = [r for r in types if r.name == type_]
+    r_type = [r for r in r_type if r.method == method]
+    if r_type:
+        if getattr(r_type[0], attribute) is not None:
+            return getattr(r_type[0], attribute)
+    return []
+
+
+def __get_trait(attribute, root, is_):
+    """
+    Returns list of ``attribute`` (e.g. ``responses``) defined in a
+    trait, or an empty ``list``.
+    """
+    trait_objs = []
+    for i in is_:
+        trait = [t for t in root.traits if t.name == i]
+        if trait:
+            if getattr(trait[0], attribute) is not None:
+                trait_objs.extend(getattr(trait[0], attribute))
+    return trait_objs
+
+
+# <--FIXME: URI params for resource types-->
+# TODO: FIXME in order to use in parser.py
+def create_uri_params_res_types(data, raw_data, method, root, inherit=False):
+    m_data, r_data = _get_res_type_attribute(raw_data, data, "uriParameters")
+    # param_data = _get_attribute("uriParameters", method, raw_data)
+    param_data = dict(list(iteritems(m_data)) + list(iteritems(r_data)))
+    if inherit:
+        param_data = __get_inherited_type_params(raw_data, "uriParameters",
+                                                 param_data, inherit)
+
+    return __create_base_param_obj(param_data, URIParameter, root.config,
+                                   root.errors, method=method)
+
+
+def __get_inherited_type_params(data, attribute, params, resource_types):
+    inherited = __get_inherited_resource(data.get("type"), resource_types)
+    inherited = _get(inherited, data.get("type"))
+
+    inherited_params = _get(inherited, attribute, {})
+
+    return dict(list(iteritems(params)) +
+                list(iteritems(inherited_params)))
+
+
+def __get_inherited_resource(res_name, resource_types):
+    for resource in resource_types:
+        if res_name == list(iterkeys(resource))[0]:
+            return resource
+
+# </--FIXME: URI params for resource types-->
