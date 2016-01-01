@@ -618,6 +618,9 @@ def create_node(name, raw_data, method, parent, root):
         resps = _get_attribute("responses", method, raw_data)
         resp_objs = _get_inherited_objects("responses", root, res_type,
                                            method, assigned_traits)
+        for r in resp_objs:
+            if r.method is None:
+                r.method = method
         resp_codes = [r.code for r in resp_objs]
         for k, v in list(iteritems(resps)):
             if k in resp_codes:
@@ -629,7 +632,6 @@ def create_node(name, raw_data, method, parent, root):
             else:
                 resp = create_response(k, v, root, method)
                 resp_objs.append(resp)
-
         return resp_objs or None
 
     def uri_params():
