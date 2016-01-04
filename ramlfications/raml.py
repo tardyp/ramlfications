@@ -267,9 +267,12 @@ class ResourceNode(BaseNode):
                     # list of query, uri, etc
                     if isinstance(res_prop, list):
                         if isinstance(inherited_prop, list):
-                            res_prop.extend(inherited_prop)
+                            for i in inherited_prop:
+                                if i not in res_prop:
+                                    res_prop.append(i)
                         else:
-                            res_prop.append(inherited_prop)
+                            if inherited_prop not in res_prop:
+                                res_prop.append(inherited_prop)
 
     def _parse_trait_parameters(self):
         to_parse = []

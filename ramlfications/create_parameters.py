@@ -3,7 +3,14 @@
 
 from __future__ import absolute_import, division, print_function
 
+import json
 import re
+
+try:
+    from collections import OrderedDict
+except ImportError:  # pragma: no cover
+    from ordereddict import OrderedDict
+
 
 from six import iteritems, itervalues, iterkeys
 
@@ -13,11 +20,11 @@ from .parameters import (
     SecurityScheme
 )
 from .utils import load_schema
-
+from . import parameter_tags
 from ._utils.common_utils import _get
 from ._utils.parser_utils import (
     _remove_duplicates, _get_attribute,
-    _get_inherited_item, _get_scheme, _get_res_type_attribute,
+    _get_inherited_item, _get_scheme,
 )
 
 #####
@@ -470,7 +477,8 @@ def __get_trait(attribute, root, is_):
 # <--FIXME: URI params for resource types-->
 # TODO: FIXME in order to use in parser.py
 def create_uri_params_res_types(data, raw_data, method, root, inherit=False):
-    m_data, r_data = _get_res_type_attribute(raw_data, data, "uriParameters")
+    m_data, r_data = resolve_scalar(data, raw_data, "uriParameters",
+                                    default={})
     # param_data = _get_attribute("uriParameters", method, raw_data)
     param_data = dict(list(iteritems(m_data)) + list(iteritems(r_data)))
     if inherit:
@@ -497,3 +505,191 @@ def __get_inherited_resource(res_name, resource_types):
             return resource
 
 # </--FIXME: URI params for resource types-->
+
+
+#####
+# trying something new:
+# for any child node that inherits shit:
+# 1. get the raw data of the inherited
+# 2. parse for `<<parameters>>` and func tags
+# 3. merge data/data union
+# 4. create the actual object
+#####
+
+# copied over from parameter_utils.py
+PATTERN = r'(<<\s*)(?P<pname>{0}\b[^\s|]*)(\s*\|?\s*(?P<tag>!\S*))?(\s*>>)'
+
+
+def _replace_str_attr(param, new_value, current_str):
+    """
+    Replaces ``<<parameters>>`` with their assigned value, processed with \
+    any function tags, e.g. ``!pluralize``.
+    """
+    p = re.compile(PATTERN.format(param))
+    ret = re.findall(p, current_str)
+    if not ret:
+        return current_str
+    for item in ret:
+        to_replace = "".join(item[0:3]) + item[-1]
+        tag_func = item[3]
+        if tag_func:
+            tag_func = tag_func.strip("!")
+            tag_func = tag_func.strip()
+            func = getattr(parameter_tags, tag_func)
+            if func:
+                new_value = func(new_value)
+        current_str = current_str.replace(to_replace, str(new_value), 1)
+
+    return current_str
+
+
+def _rename_me(attr, root, res_type, method):
+    if not res_type:
+        return {}
+    raml = _get(root.raw, "resourceTypes")
+    return _get_inherited_res_type_data(attr, raml, res_type, method, root)
+
+
+def _trait_data(attr, root, _is):
+    if not _is:
+        return {}
+    raml = _get(root.raw, "traits")
+    return _get_inherited_trait_data(attr, raml, _is, root)
+
+
+def _get_inherited_trait_data(attr, traits, name, root):
+    if isinstance(name, dict):
+        name = list(iterkeys(name))
+
+    trait_raml = [t for t in traits if list(iterkeys(t))[0] in name]
+    trait_data = []
+    for n in name:
+        for t in trait_raml:
+            t_raml = _get(t, n, {})
+            attribute_data = _get(t_raml, attr, {})
+            trait_data.append({attr: attribute_data})
+    return trait_data
+
+
+def _get_inherited_res_type_data(attr, types, name, method, root):
+    if isinstance(name, dict):
+        name = list(iterkeys(name))[0]
+    res_type_raml = [r for r in types if list(iterkeys(r))[0] == name]
+    if res_type_raml:
+        res_type_raml = _get(res_type_raml[0], name, {})
+        raw = _get(res_type_raml, method, None)
+        if not raw:
+            raw = _get(res_type_raml, method + "?", {})
+        attribute_data = _get(raw, attr, {})
+        if res_type_raml.get("type"):
+            inherited = _rename_me(attr, root, res_type_raml.get("type"),
+                                   method)
+            attribute_data = merge_dicts(attribute_data, inherited)
+        return attribute_data
+    return {}
+
+
+def _x_create_response_objects(data, method, root, to_replace):
+    if not data:
+        return []
+    if to_replace and isinstance(to_replace, dict):
+        json_data = json.dumps(data)
+        for k, v in list(iteritems(to_replace)):
+            json_data = _replace_str_attr(json_data, v, k)
+        data = json.loads(json_data, object_pairs_hook=OrderedDict)
+
+    resp_objs = []
+    for k, v in list(iteritems(data)):
+        resp = create_response(k, v, root, method)
+        resp_objs.append(resp)
+    return sorted(resp_objs, key=lambda x: x.code)
+
+
+def _x_create_body_objects(data, method, root, to_replace):
+    if not data:
+        return []
+    if to_replace and isinstance(to_replace, dict):
+        json_data = json.dumps(data)
+        for k, v in list(iteritems(to_replace)):
+            json_data = _replace_str_attr(json_data, v, k)
+        data = json.loads(json_data, object_pairs_hook=OrderedDict)
+
+    body_objs = []
+    for k, v in list(iteritems(data)):
+        body = create_body(k, v, root)
+        body_objs.append(body)
+    return body_objs
+
+
+def _x_create_header_objects(data, method, root, to_replace):
+    if not data:
+        return []
+    if to_replace and isinstance(to_replace, dict):
+        json_data = json.dumps(data)
+        for k, v in list(iteritems(to_replace)):
+            json_data = _replace_str_attr(json_data, v, k)
+        data = json.loads(json_data, object_pairs_hook=OrderedDict)
+
+    kw = dict(method=method)
+    return __create_base_param_obj(data, Header, root.config,
+                                   root.errors, **kw)
+
+
+def create_resource_type_objects(param, data, v, method, root, is_):
+    if is_:
+        trait_data = _trait_data(param, root, is_)
+        for t in trait_data:
+            data = merge_dicts(data, t)
+    if _get(v, "type"):
+        inherited = _rename_me(param, root, _get(v, "type"), method)
+        params = _get(data, param, {})
+        params = merge_dicts(params, inherited, ret={})
+        if param == "body":
+            params = _x_create_body_objects(params, method, root,
+                                            _get(v, "type"))
+        elif param == "responses":
+            params = _x_create_response_objects(params, method, root,
+                                                _get(v, "type"))
+        else:
+            object_name = __map_object(param)
+            params = __create_base_param_obj(params, object_name, root.config,
+                                             root.errors, method=method)
+    else:
+        if param == "body":
+            params = create_bodies(data, method, root)
+        elif param == "responses":
+            params = create_responses(data, root, method)
+        else:
+            params = create_param_objs(data, method, root.config, root.errors,
+                                       param)
+    return params or None
+
+
+def merge_dicts(data, inherited_data, ret={}):
+    if not isinstance(data, dict):
+        return data
+    data_keys = list(iterkeys(data))
+    inherited_keys = list(iterkeys(inherited_data))
+
+    data_only = [d for d in data_keys if d not in inherited_keys]
+    inherit_only = [i for i in inherited_keys if i not in data_keys]
+    both = [d for d in data_keys if d in inherited_keys]
+
+    for d in data_only:
+        ret[d] = data.get(d)
+    for i in inherit_only:
+        ret[i] = inherited_data.get(i)
+
+    for b in both:
+        b_data = data.get(b)
+        b_inherited = inherited_data.get(b)
+        ret[b] = {}
+        ret[b] = merge_dicts(b_data, b_inherited, ret[b])
+
+    return ret
+
+
+def resolve_scalar(method_data, resource_data, item, default):
+    method_level = _get(method_data, item, default)
+    resource_level = _get(resource_data, item, default)
+    return method_level, resource_level

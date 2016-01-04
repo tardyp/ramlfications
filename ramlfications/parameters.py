@@ -325,7 +325,12 @@ class Response(object):
 
     def _substitute_parameters(self, obj, name, value):
         params = ["code", "raw", "desc", "method"]
-        pu._substitute_parameters(obj, name, value, params)
+        for s in params:
+            current_value = getattr(self, s)
+            if current_value:
+                if isinstance(current_value, str):
+                    new_value = pu._replace_str_attr(name, value, current_value)
+                    setattr(obj, s, new_value)
         recurse_objs = ["headers", "body"]
         for r in recurse_objs:
             r_objs = getattr(self, r)

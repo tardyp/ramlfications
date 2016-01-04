@@ -65,6 +65,8 @@ def _map_param_unparsed_str_obj(param):
 # Note: this is only used in `create_node`
 def _remove_duplicates(inherit_params, resource_params):
     ret = []
+    if not resource_params:
+        return inherit_params
     if isinstance(resource_params[0], Body):
         _params = [p.mime_type for p in resource_params]
     elif isinstance(resource_params[0], Response):

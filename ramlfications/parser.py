@@ -29,7 +29,8 @@ from ._utils.parser_utils import (
 from .create_parameters import (
     create_response, create_bodies, create_responses,
     create_security_schemes, create_uri_params_res_types, create_param_objs,
-    create_uri_params, _set_params, _get_inherited_objects
+    create_uri_params, _set_params, _get_inherited_objects, _rename_me,
+    _x_create_response_objects, merge_dicts
 )
 
 
@@ -633,6 +634,9 @@ def create_node(name, raw_data, method, parent, root):
                 resp = create_response(k, v, root, method)
                 resp_objs.append(resp)
         return resp_objs or None
+        # inherited_resp = _rename_me("responses", root, res_type, method)
+        # data = merge_dicts(resps, inherited_resp)
+        # return _x_create_response_objects(data, method, root, res_type)
 
     def uri_params():
         """Set resource's URI parameters."""
@@ -803,10 +807,11 @@ def create_node(name, raw_data, method, parent, root):
     )
 
     if res_type:
-        node._parse_resource_type_parameters()
-        node._inherit_type_test()
-        node._inherit_type()
+        pass
+        # node._parse_resource_type_parameters()
+        # node._inherit_type_test()
+        # node._inherit_type()
     if res_is:
-        node._parse_trait_parameters()
         node._inherit_trait_objects()
+        node._parse_trait_parameters()
     return node

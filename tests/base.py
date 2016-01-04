@@ -10,3 +10,5 @@ VALIDATE = os.path.join(PAR_DIR + '/data/validate/')
 FIXTURES = os.path.join(PAR_DIR + '/data/fixtures/')
 UPDATE = os.path.join(PAR_DIR + '/data/update/')
 JSONREF = os.path.join(PAR_DIR + '/data/jsonref/')
+
+V020EXAMPLES = os.path.join(PAR_DIR + '/data/v020examples/')
