@@ -30,7 +30,7 @@ from .create_parameters import (
     create_response, create_bodies, create_responses,
     create_security_schemes, create_uri_params_res_types, create_param_objs,
     create_uri_params, _set_params, _get_inherited_objects, _rename_me,
-    _x_create_response_objects, merge_dicts
+    _create_res_type_body_objects, merge_dicts
 )
 
 
@@ -636,7 +636,7 @@ def create_node(name, raw_data, method, parent, root):
         return resp_objs or None
         # inherited_resp = _rename_me("responses", root, res_type, method)
         # data = merge_dicts(resps, inherited_resp)
-        # return _x_create_response_objects(data, method, root, res_type)
+        # return _create_res_type_body_objects(data, method, root, res_type)
 
     def uri_params():
         """Set resource's URI parameters."""

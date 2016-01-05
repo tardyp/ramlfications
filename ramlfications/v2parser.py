@@ -299,48 +299,56 @@ def create_resource_types(raml_data, root):
     # Set ResourceTypeNode attributes
     #####
 
-    def headers(data):
-        _is = is_(data)
-        return create_resource_type_objects("headers", data, v,
-                                            method(meth), root, _is)
-
-    def body(data):
-        _is = is_(data)
-        return create_resource_type_objects("body", data, v, method(meth),
+    def headers(method_data, resource_data):
+        _is = is_(method_data, resource_data)
+        return create_resource_type_objects("headers", method_data,
+                                            resource_data, method(meth),
                                             root, _is)
 
-    def responses(data):
-        _is = is_(data)
-        return create_resource_type_objects("responses", data, v,
+    def body(method_data, resource_data):
+        _is = is_(method_data, resource_data)
+        return create_resource_type_objects("body", method_data, resource_data,
                                             method(meth), root, _is)
 
-    def uri_params(data):
+    def responses(method_data, resource_data):
+        _is = is_(method_data, resource_data)
+        return create_resource_type_objects("responses", method_data,
+                                            resource_data, method(meth),
+                                            root, _is)
+
+    def uri_params(method_data, resource_data):
         inherit = False
         if _get(v, "type"):
             inherit = resource_types
-        return create_uri_params_res_types(data, v, method, root, inherit)
+        return create_uri_params_res_types(method_data, resource_data, method,
+                                           root, inherit)
 
-    def base_uri_params(data):
-        _is = is_(data)
-        return create_resource_type_objects("baseUriParameters", data, v,
-                                            method(meth), root, _is)
+    def base_uri_params(method_data, resource_data):
+        _is = is_(method_data, resource_data)
+        return create_resource_type_objects("baseUriParameters", method_data,
+                                            resource_data, method(meth),
+                                            root, _is)
 
-    def query_params(data):
-        _is = is_(data)
-        return create_resource_type_objects("queryParameters", data, v,
-                                            method(meth), root, _is)
+    def query_params(method_data, resource_data):
+        _is = is_(method_data, resource_data)
+        return create_resource_type_objects("queryParameters", method_data,
+                                            resource_data, method(meth),
+                                            root, _is)
 
-    def form_params(data):
-        _is = is_(data)
-        return create_resource_type_objects("formParameters", data, v,
-                                            method(meth), root, _is)
+    def form_params(method_data, resource_data):
+        _is = is_(method_data, resource_data)
+        return create_resource_type_objects("formParameters", method_data,
+                                            resource_data, method(meth),
+                                            root, _is)
 
-    def description(data):
-        m, r = resolve_scalar(data, v, "description", default=None)
+    def description(method_data, resource_data):
+        m, r = resolve_scalar(method_data, resource_data, "description",
+                              default=None)
         return m or r or None
 
-    def type_():
-        return _get(v, "type")
+    def type_(method_data, resource_data):
+        m, r = resolve_scalar(method_data, resource_data, "type", None)
+        return m or r or None
 
     def method(meth):
         if not meth:
@@ -353,59 +361,64 @@ def create_resource_types(raml_data, root):
         if meth:
             return "?" in meth
 
-    def protocols(data):
-        m, r = resolve_scalar(data, v, "protocols", default=None)
+    def protocols(method_data, resource_data):
+        m, r = resolve_scalar(method_data, resource_data, "protocols",
+                              default=None)
         return m or r or root.protocols
 
-    def is_(data):
-        m, r = resolve_scalar(data, v, "is", default=[])
+    def is_(method_data, resource_data):
+        m, r = resolve_scalar(method_data, resource_data, "is", default=[])
         return m + r or None
 
-    def traits(data):
-        assigned = is_(data)
+    def traits(method_data, resource_data):
+        assigned = is_(method_data, resource_data)
         if assigned:
             if root.traits:
                 trait_objs = []
                 for trait in assigned:
-                    obj = [t for t in root.traits if t.name == trait]
-                    if obj:
-                        trait_objs.append(obj[0])
+                    if isinstance(trait, dict):
+                        trait = list(iterkeys(trait))
+                    objs = [t for t in root.traits if t.name in trait]
+                    if objs:
+                        for o in objs:
+                            trait_objs.append(o)
                 return trait_objs or None
 
-    def secured_by(data):
-        m, r = resolve_scalar(data, v, "securedBy", default=[])
+    def secured_by(method_data, resource_data):
+        m, r = resolve_scalar(method_data, resource_data, "securedBy",
+                              default=[])
         return m + r or None
 
-    def security_schemes_(data):
-        secured = secured_by(data)
+    def security_schemes_(method_data, resource_data):
+        secured = secured_by(method_data, resource_data)
         if secured:
             return create_security_schemes(secured, root)
         return None
 
-    def wrap(key, data, meth, _v):
+    def wrap(key, method_data, meth, resource_data):
         return ResourceTypeNode(
             name=key,
-            raw=data,
+            raw=method_data,
             root=root,
-            headers=headers(data),
-            body=body(data),
-            responses=responses(data),
-            uri_params=uri_params(data),
-            base_uri_params=base_uri_params(data),
-            query_params=query_params(data),
-            form_params=form_params(data),
-            media_type=_get(v, "mediaType"),
-            desc=description(data),
-            type=type_(),
+            headers=headers(method_data, resource_data),
+            body=body(method_data, resource_data),
+            responses=responses(method_data, resource_data),
+            uri_params=uri_params(method_data, resource_data),
+            base_uri_params=base_uri_params(method_data, resource_data),
+            query_params=query_params(method_data, resource_data),
+            form_params=form_params(method_data, resource_data),
+            media_type=_get(resource_data, "mediaType"),
+            desc=description(method_data, resource_data),
+            type=type_(method_data, resource_data),
             method=method(meth),
-            usage=_get(v, "usage"),
+            usage=_get(resource_data, "usage"),
             optional=optional(),
-            is_=is_(data),
-            traits=traits(data),
-            secured_by=secured_by(data),
-            security_schemes=security_schemes_(data),
-            display_name=_get(data, "displayName", key),
-            protocols=protocols(data),
+            is_=is_(method_data, resource_data),
+            traits=traits(method_data, resource_data),
+            secured_by=secured_by(method_data, resource_data),
+            security_schemes=security_schemes_(method_data, resource_data),
+            display_name=_get(method_data, "displayName", key),
+            protocols=protocols(method_data, resource_data),
             errors=root.errors
         )
 

@@ -8,10 +8,15 @@ left off:
 
 # 1/3/2016
 
-- `resource_type[i].responses[j].body[k].form_params` are `OrderedDicts`, not parsed into a list of form parameters
-- order of query parmaeters not preserved
-- do traits have display names? currently not implemented, need to double check with spec
-- resource types should have a `resource_type` attribute since they have a `type` attribute
+- [x] `resource_type[i].responses[j].body[k].form_params` are `OrderedDicts`, not parsed into a list of form parameters
+- [ ] order of query parmaeters not preserved
+- [ ] do traits have display names? currently not implemented, need to double check with spec
+- [ ] resource types should have a `resource_type` attribute since they have a `type` attribute
 
 left off:
-- [DONE] trait objects are not being inherited by resource types
+- [x] trait objects are not being inherited by resource types
+
+
+# 1/4/2016
+
+- [ ] trait `<< parameter >>` substitution isn't working

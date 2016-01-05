@@ -137,18 +137,20 @@ def _set_params(data, attr_name, root, inherit=False, **kw):
     return __remove_duplicates(to_clean)
 
 
-def create_body(mime_type, data, root):
+def create_body(mime_type, data, root, method):
     """
     Create a ``.parameters.Body`` object.
     """
     raw = {mime_type: data}
+    form_params = create_param_objs(data, method, root.config, root.errors,
+                                    "formParameters")
     return Body(
         mime_type=mime_type,
         raw=raw,
         schema=load_schema(_get(data, "schema")),
         example=load_schema(_get(data, "example")),
         # TODO: should create form param objects?
-        form_params=_get(data, "formParameters"),
+        form_params=form_params,
         config=root.config,
         errors=root.errors
     )
@@ -166,7 +168,7 @@ def create_bodies(data, method, root, resource_types=False):
     for k, v in list(iteritems(bodies)):
         if v is None:
             continue
-        body = create_body(k, v, root)
+        body = create_body(k, v, root, method)
         body_objects.append(body)
     return body_objects or None
 
@@ -174,7 +176,7 @@ def create_bodies(data, method, root, resource_types=False):
 def create_response(code, data, root, method, inherited_resp=None):
     """Returns a ``.parameters.Response`` object"""
     headers = _create_response_headers(data, method, root)
-    body = _create_response_body(data, root)
+    body = _create_response_body(data, root, method)
     desc = _get(data, "description", None)
     if inherited_resp:
         if inherited_resp.headers:
@@ -208,7 +210,7 @@ def _create_response_headers(data, method, root):
     return header_objects or None
 
 
-def _create_response_body(data, root):
+def _create_response_body(data, root, method):
     """
     Create ``.parameters.Body`` objects for a ``.parameters.Response``
     object.
@@ -225,10 +227,10 @@ def _create_response_body(data, root):
         else:
             # spec might be '!!null'
             raw = spec or body
-            _body = create_body(key, raw, root)
+            _body = create_body(key, raw, root, method)
             body_list.append(_body)
     if no_mime_body_data:
-        _body = create_body(root.media_type, no_mime_body_data, root)
+        _body = create_body(root.media_type, no_mime_body_data, root, method)
         body_list.append(_body)
 
     return body_list or None
@@ -539,7 +541,6 @@ def _replace_str_attr(param, new_value, current_str):
             if func:
                 new_value = func(new_value)
         current_str = current_str.replace(to_replace, str(new_value), 1)
-
     return current_str
 
 
@@ -558,12 +559,15 @@ def _trait_data(attr, root, _is):
 
 
 def _get_inherited_trait_data(attr, traits, name, root):
-    if isinstance(name, dict):
-        name = list(iterkeys(name))
-
-    trait_raml = [t for t in traits if list(iterkeys(t))[0] in name]
-    trait_data = []
+    names = []
     for n in name:
+        if isinstance(n, dict):
+            n = list(iterkeys(n))[0]
+        names.append(n)
+
+    trait_raml = [t for t in traits if list(iterkeys(t))[0] in names]
+    trait_data = []
+    for n in names:
         for t in trait_raml:
             t_raml = _get(t, n, {})
             attribute_data = _get(t_raml, attr, {})
@@ -589,7 +593,7 @@ def _get_inherited_res_type_data(attr, types, name, method, root):
     return {}
 
 
-def _x_create_response_objects(data, method, root, to_replace):
+def _create_res_type_response_objects(data, method, root, to_replace):
     if not data:
         return []
     if to_replace and isinstance(to_replace, dict):
@@ -605,7 +609,7 @@ def _x_create_response_objects(data, method, root, to_replace):
     return sorted(resp_objs, key=lambda x: x.code)
 
 
-def _x_create_body_objects(data, method, root, to_replace):
+def _create_res_type_body_objects(data, method, root, to_replace):
     if not data:
         return []
     if to_replace and isinstance(to_replace, dict):
@@ -616,40 +620,58 @@ def _x_create_body_objects(data, method, root, to_replace):
 
     body_objs = []
     for k, v in list(iteritems(data)):
-        body = create_body(k, v, root)
+        body = create_body(k, v, root, method)
         body_objs.append(body)
     return body_objs
 
 
-def _x_create_header_objects(data, method, root, to_replace):
-    if not data:
-        return []
-    if to_replace and isinstance(to_replace, dict):
-        json_data = json.dumps(data)
-        for k, v in list(iteritems(to_replace)):
-            json_data = _replace_str_attr(json_data, v, k)
-        data = json.loads(json_data, object_pairs_hook=OrderedDict)
-
-    kw = dict(method=method)
-    return __create_base_param_obj(data, Header, root.config,
-                                   root.errors, **kw)
-
-
 def create_resource_type_objects(param, data, v, method, root, is_):
+    """
+    Returns a list of ``.parameter`` objects as designated by ``param``
+    from the given ``data``. Will parse data the object inherits if
+    assigned another resource type and/or trait(s).
+
+    :param str param: RAML-specified paramter, e.g. "resources", \
+        "queryParameters"
+    :param dict data: method-level ``param`` data
+    :param dict v: resource-type-level ``param`` data
+    :param str method: designated method
+    :param root: ``.raml.RootNode`` object
+    :param list is_: list of assigned traits, either ``str`` or
+        ``dict`` mapping key: value pairs to ``<<parameter>>`` values
+    """
     if is_:
         trait_data = _trait_data(param, root, is_)
         for t in trait_data:
             data = merge_dicts(data, t)
-    if _get(v, "type"):
-        inherited = _rename_me(param, root, _get(v, "type"), method)
+        if data and isinstance(is_, dict):
+            json_data = json.dumps(data)
+            param_type = list(iterkeys(is_))[0]
+            param_data = list(itervalues(is_))[0]
+            for key, value in list(iteritems(param_data)):
+                json_data = _replace_str_attr(key, value, json_data)
+            if isinstance(json_data, str):
+                params = json.loads(json_data, objet_pairs_hook=OrderedDict)
+    m_type, r_type = resolve_scalar(data, v, "type", None)
+    type_ = m_type or r_type or None
+    if type_:
+        inherited = _rename_me(param, root, type_, method)
         params = _get(data, param, {})
         params = merge_dicts(params, inherited, ret={})
+        if params and isinstance(type_, dict):
+            json_data = json.dumps(params)
+            param_type = type_
+            param_data = list(itervalues(param_type))[0]
+            for key, value in list(iteritems(param_data)):
+                json_data = _replace_str_attr(key, value, json_data)
+            if isinstance(json_data, str):
+                params = json.loads(json_data, object_pairs_hook=OrderedDict)
         if param == "body":
-            params = _x_create_body_objects(params, method, root,
-                                            _get(v, "type"))
+            params = _create_res_type_body_objects(params, method, root,
+                                                   type_)
         elif param == "responses":
-            params = _x_create_response_objects(params, method, root,
-                                                _get(v, "type"))
+            params = _create_res_type_response_objects(params, method, root,
+                                                       type_)
         else:
             object_name = __map_object(param)
             params = __create_base_param_obj(params, object_name, root.config,
@@ -666,6 +688,12 @@ def create_resource_type_objects(param, data, v, method, root, is_):
 
 
 def merge_dicts(data, inherited_data, ret={}):
+    """
+    Returns a ``dict`` of attribute data that is merged from a resource
+    (node|type|trait) and its inherited data, giving preference to the
+    resource (node|type|trait) data over the
+    inherited data.
+    """
     if not isinstance(data, dict):
         return data
     data_keys = list(iterkeys(data))
@@ -690,6 +718,10 @@ def merge_dicts(data, inherited_data, ret={}):
 
 
 def resolve_scalar(method_data, resource_data, item, default):
+    """
+    Returns tuple of method-level and resource-level data for a desired
+    attribute (e.g. ``description``).  Used for ``scalar`` -type attributes.
+    """
     method_level = _get(method_data, item, default)
     resource_level = _get(resource_data, item, default)
     return method_level, resource_level

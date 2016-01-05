@@ -11,13 +11,7 @@ from ramlfications.config import setup_config
 from ramlfications._helpers import load_file
 
 
-from tests.base import V020EXAMPLES
-
-
-# TODO: create a better assert message
-def _assert_not_set(obj, properties):
-    for p in properties:
-        assert not getattr(obj, p)
+from tests.base import V020EXAMPLES, assert_not_set
 
 
 @pytest.fixture(scope="session")
@@ -31,11 +25,13 @@ def api():
 
 def test_create_resource_types(api):
     types = api.resource_types
-    assert len(types) == 8
+    assert len(types) == 12
 
     exp = [
         "base", "base", "inheritBase", "queryParamType", "formParamType",
-        "typeWithTrait", "protocolsType", "securedByType"
+        "typeWithTrait", "protocolsType", "securedByType", "parameterType",
+        "inheritParameterTypeResourceAssigned",
+        "inheritParameterTypeMethodAssigned", "typeWithParameterTrait"
     ]
     assert exp == [t.name for t in types]
 
@@ -64,7 +60,7 @@ def test_root_resource_types_base_get(api):
         "default", "enum", "example", "max_length", "maximum",
         "min_length", "minimum", "pattern", "repeat", "required"
     ]
-    _assert_not_set(header, not_set)
+    assert_not_set(header, not_set)
 
     body = base_get.body[0]
     assert body.mime_type == "application/json"
@@ -92,7 +88,7 @@ def test_root_resource_types_base_get(api):
     not_set = [
         "default", "enum", "max_length", "min_length", "pattern", "repeat"
     ]
-    _assert_not_set(resp_header, not_set)
+    assert_not_set(resp_header, not_set)
 
     resp_body = resp.body[0]
     assert resp_body.mime_type == "application/json"
@@ -124,7 +120,7 @@ def test_root_resource_types_base_post(api):
         "default", "enum", "example", "max_length", "maximum",
         "min_length", "minimum", "pattern", "repeat", "required"
     ]
-    _assert_not_set(header, not_set)
+    assert_not_set(header, not_set)
 
     body = base_post.body[0]
     assert body.mime_type == "application/json"
@@ -152,7 +148,7 @@ def test_root_resource_types_base_post(api):
     not_set = [
         "default", "enum", "max_length", "min_length", "pattern", "repeat"
     ]
-    _assert_not_set(resp_header, not_set)
+    assert_not_set(resp_header, not_set)
 
     resp_body = resp.body[0]
     assert resp_body.mime_type == "application/json"
@@ -187,7 +183,7 @@ def test_root_resource_types_inherit_base(api):
         "default", "enum", "example", "max_length", "maximum",
         "min_length", "minimum", "pattern", "repeat", "required"
     ]
-    _assert_not_set(header, not_set)
+    assert_not_set(header, not_set)
 
     json_body = inherit_base.body[0]
     assert json_body.mime_type == "application/json"
@@ -201,11 +197,16 @@ def test_root_resource_types_inherit_base(api):
     assert not form_body.schema
     assert not form_body.example
 
-    # TODO: fixme, see NOTES.md 1/3/2016
-    # form_param = form_body.form_params[0]
-    # assert form_param.name == "foo"
-    # assert form_param.display_name == "Foo"
-    # assert form_param.description.raw == "some foo bar"
+    form_param = form_body.form_params[0]
+    assert form_param.name == "foo"
+    assert form_param.display_name == "Foo"
+    assert form_param.description.raw == "some foo bar"
+    assert form_param.type == "string"
+    not_set = [
+        "default", "enum", "example", "max_length", "maximum", "min_length",
+        "minimum", "pattern", "repeat", "required"
+    ]
+    assert_not_set(form_param, not_set)
 
     resp200 = inherit_base.responses[0]
     assert resp200.code == 200
@@ -224,7 +225,7 @@ def test_root_resource_types_inherit_base(api):
         "default", "enum", "max_length", "maximum", "min_length", "minimum",
         "pattern", "repeat"
     ]
-    _assert_not_set(resp200_header, not_set)
+    assert_not_set(resp200_header, not_set)
 
     resp200_body = resp200.body[0]
     assert resp200_body.mime_type == "application/json"
@@ -252,7 +253,7 @@ def test_root_resource_types_inherit_base(api):
     not_set = [
         "default", "enum", "max_length", "min_length", "pattern", "repeat"
     ]
-    _assert_not_set(resp403_header, not_set)
+    assert_not_set(resp403_header, not_set)
 
     resp403_body = resp403.body[0]
     assert resp403_body.mime_type == "application/json"
@@ -265,9 +266,7 @@ def test_root_resource_types_inherit_base(api):
     assert resp500.description.raw == "A 500 response"
     assert resp500.method == "get"
     assert len(resp500.headers) == 1
-    # TODO: FIXME, somehow body is being inherited here!!
-    #              from 200 response I believe
-    # assert not resp500.body
+    assert not resp500.body
 
     resp500_header = resp500.headers[0]
     assert resp500_header.name == "X-InheritBase-ServerError-Response-Header"
@@ -280,7 +279,7 @@ def test_root_resource_types_inherit_base(api):
         "default", "enum", "maximum", "max_length", "minimum", "min_length",
         "pattern", "repeat"
     ]
-    _assert_not_set(resp500_header, not_set)
+    assert_not_set(resp500_header, not_set)
 
 
 def test_root_resource_types_query_param(api):
@@ -293,7 +292,7 @@ def test_root_resource_types_query_param(api):
     desc = ("A resource type with query parameters")
     assert query_param.description.raw == desc
     not_set = ["headers", "body", "responses", "form_params", "uri_params"]
-    _assert_not_set(query_param, not_set)
+    assert_not_set(query_param, not_set)
 
     assert len(query_param.query_params) == 6
 
@@ -310,7 +309,7 @@ def test_root_resource_types_query_param(api):
     assert string.pattern == "^[a-zA-Z0-9][-a-zA-Z0-9]*$"
     assert string.repeat
     not_set = ["enum", "example"]
-    _assert_not_set(string, not_set)
+    assert_not_set(string, not_set)
 
     integer = query_param.query_params[1]
     assert integer.name == "intParam"
@@ -324,7 +323,7 @@ def test_root_resource_types_query_param(api):
     assert integer.example == 5
     assert integer.default == 10
     not_set = ["enum", "pattern", "repeat", "max_length", "min_length"]
-    _assert_not_set(integer, not_set)
+    assert_not_set(integer, not_set)
 
     enum = query_param.query_params[2]
     assert enum.name == "enumParam"
@@ -339,7 +338,7 @@ def test_root_resource_types_query_param(api):
         "example", "pattern", "repeat", "max_length", "min_length",
         "minimum", "maximum"
     ]
-    _assert_not_set(enum, not_set)
+    assert_not_set(enum, not_set)
 
     date = query_param.query_params[3]
     assert date.name == "dateParam"
@@ -353,7 +352,7 @@ def test_root_resource_types_query_param(api):
         "example", "pattern", "max_length", "maximum", "min_length",
         "minimum", "enum", "default"
     ]
-    _assert_not_set(date, not_set)
+    assert_not_set(date, not_set)
 
     boolean = query_param.query_params[4]
     assert boolean.name == "boolParam"
@@ -367,7 +366,7 @@ def test_root_resource_types_query_param(api):
         "example", "pattern", "max_length", "maximum", "min_length",
         "minimum", "enum", "default"
     ]
-    _assert_not_set(boolean, not_set)
+    assert_not_set(boolean, not_set)
 
     filep = query_param.query_params[5]
     assert filep.name == "fileParam"
@@ -381,7 +380,7 @@ def test_root_resource_types_query_param(api):
         "example", "pattern", "max_length", "maximum", "min_length",
         "minimum", "enum", "default"
     ]
-    _assert_not_set(boolean, not_set)
+    assert_not_set(boolean, not_set)
 
 
 def test_root_resource_types_form_param(api):
@@ -394,7 +393,7 @@ def test_root_resource_types_form_param(api):
     desc = ("A resource type with form parameters")
     assert form_param.description.raw == desc
     not_set = ["headers", "body", "responses", "query_params", "uri_params"]
-    _assert_not_set(form_param, not_set)
+    assert_not_set(form_param, not_set)
 
     assert len(form_param.form_params) == 6
 
@@ -411,7 +410,7 @@ def test_root_resource_types_form_param(api):
     assert string.pattern == "^[a-zA-Z0-9][-a-zA-Z0-9]*$"
     assert string.repeat
     not_set = ["enum", "example"]
-    _assert_not_set(string, not_set)
+    assert_not_set(string, not_set)
 
     integer = form_param.form_params[1]
     assert integer.name == "intParam"
@@ -425,7 +424,7 @@ def test_root_resource_types_form_param(api):
     assert integer.example == 5
     assert integer.default == 10
     not_set = ["enum", "pattern", "repeat", "max_length", "min_length"]
-    _assert_not_set(integer, not_set)
+    assert_not_set(integer, not_set)
 
     enum = form_param.form_params[2]
     assert enum.name == "enumParam"
@@ -440,7 +439,7 @@ def test_root_resource_types_form_param(api):
         "example", "pattern", "repeat", "max_length", "min_length",
         "minimum", "maximum"
     ]
-    _assert_not_set(enum, not_set)
+    assert_not_set(enum, not_set)
 
     date = form_param.form_params[3]
     assert date.name == "dateParam"
@@ -454,7 +453,7 @@ def test_root_resource_types_form_param(api):
         "example", "pattern", "max_length", "maximum", "min_length",
         "minimum", "enum", "default"
     ]
-    _assert_not_set(date, not_set)
+    assert_not_set(date, not_set)
 
     boolean = form_param.form_params[4]
     assert boolean.name == "boolParam"
@@ -468,7 +467,7 @@ def test_root_resource_types_form_param(api):
         "example", "pattern", "max_length", "maximum", "min_length",
         "minimum", "enum", "default"
     ]
-    _assert_not_set(boolean, not_set)
+    assert_not_set(boolean, not_set)
 
     filep = form_param.form_params[5]
     assert filep.name == "fileParam"
@@ -482,7 +481,7 @@ def test_root_resource_types_form_param(api):
         "example", "pattern", "max_length", "maximum", "min_length",
         "minimum", "enum", "default"
     ]
-    _assert_not_set(boolean, not_set)
+    assert_not_set(boolean, not_set)
 
 
 def test_root_resource_types_assigned_trait(api):
@@ -541,3 +540,159 @@ def test_root_resource_types_secured_by(api):
     assert not secured.optional
     assert secured.description.raw == "Resource Type is secured"
     assert secured.secured_by == ["oauth_2_0"]
+
+
+def test_root_resource_types_parameter(api):
+    res = api.resource_types[8]
+
+    assert res.name == "parameterType"
+    assert res.display_name == "parameterType"
+    assert res.method == "get"
+    assert not res.optional
+    assert res.protocols == ["HTTPS"]
+    desc = "A resource type with substitutable parameters"
+    assert res.description.raw == desc
+    assert len(res.query_params) == 2
+
+    not_set = [
+        "form_params", "headers", "is_", "media_type", "responses",
+        "secured_by", "security_schemes", "traits", "type", "uri_params",
+        "usage"
+    ]
+    assert_not_set(res, not_set)
+
+    q_param = res.query_params[0]
+    assert q_param.name == "<<queryParamName>>"
+    desc = ("Return <<resourcePathName>> that have their <<queryParamName>> "
+            "matching the given value")
+    assert q_param.description.raw == desc
+
+    fallback = res.query_params[1]
+    assert fallback.name == "<<fallbackParamName>>"
+    desc = ("If no values match the value given for <<queryParamName>>, use "
+            "<<fallbackParamName>> instead")
+    assert fallback.description.raw == desc
+
+    not_set = [
+        "default", "enum", "example", "max_length", "maximum",
+        "min_length", "minimum", "pattern", "repeat", "required"
+    ]
+    assert_not_set(q_param, not_set)
+    assert_not_set(fallback, not_set)
+
+
+def test_root_resource_types_inherit_parameter_resource(api):
+    res = api.resource_types[9]
+
+    assert res.name == "inheritParameterTypeResourceAssigned"
+    assert res.display_name == "inheritParameterTypeResourceAssigned"
+    assert res.method == "get"
+    assert not res.optional
+    desc = "Inherits parameterType resource type"
+    assert res.description.raw == desc
+    assert len(res.query_params) == 2
+
+    not_set = [
+        "form_params", "headers", "is_", "media_type", "responses",
+        "secured_by", "security_schemes", "traits", "uri_params", "usage"
+    ]
+    assert_not_set(res, not_set)
+
+    q_param = res.query_params[0]
+    assert q_param.name == "foo"
+    desc = ("Return <<resourcePathName>> that have their foo "
+            "matching the given value")
+    assert q_param.description.raw == desc
+
+    fallback = res.query_params[1]
+    assert fallback.name == "bar"
+    desc = ("If no values match the value given for foo, use "
+            "bar instead")
+    assert fallback.description.raw == desc
+
+    not_set = [
+        "default", "enum", "example", "max_length", "maximum",
+        "min_length", "minimum", "pattern", "repeat", "required"
+    ]
+    assert_not_set(q_param, not_set)
+    assert_not_set(fallback, not_set)
+
+
+def test_root_resource_types_inherit_parameter_method(api):
+    res = api.resource_types[10]
+
+    assert res.name == "inheritParameterTypeMethodAssigned"
+    assert res.display_name == "inheritParameterTypeMethodAssigned"
+    assert res.method == "get"
+    assert not res.optional
+    desc = "Inherits parameterType resource type"
+    assert res.description.raw == desc
+    assert len(res.query_params) == 2
+
+    not_set = [
+        "form_params", "headers", "is_", "media_type", "responses",
+        "secured_by", "security_schemes", "traits", "uri_params", "usage"
+    ]
+    assert_not_set(res, not_set)
+
+    q_param = res.query_params[0]
+    assert q_param.name == "foo"
+    desc = ("Return <<resourcePathName>> that have their foo "
+            "matching the given value")
+    assert q_param.description.raw == desc
+
+    fallback = res.query_params[1]
+    assert fallback.name == "bar"
+    desc = ("If no values match the value given for foo, use "
+            "bar instead")
+    assert fallback.description.raw == desc
+
+    not_set = [
+        "default", "enum", "example", "max_length", "maximum",
+        "min_length", "minimum", "pattern", "repeat", "required"
+    ]
+    assert_not_set(q_param, not_set)
+    assert_not_set(fallback, not_set)
+
+
+def test_root_resource_types_inherit_parameter_trait(api):
+    res = api.resource_types[11]
+
+    assert res.name == "typeWithParameterTrait"
+    assert res.display_name == "Resource Type with Parameter Trait"
+    assert res.method == "get"
+    assert res.protocols == ["HTTPS"]
+    assert len(res.is_) == 1
+    assert len(res.traits) == 1
+    assert len(res.query_params) == 1
+    assert len(res.responses) == 1
+    assert len(res.responses[0].headers) == 1
+
+    not_set = [
+        "form_params", "headers", "type", "media_type", "secured_by",
+        "security_schemes", "uri_params", "usage", "body"
+    ]
+    assert_not_set(res, not_set)
+
+    q_param = res.query_params[0]
+    assert q_param.name == "numPages"
+    desc = ("The number of pages to return, not to exceed 10")
+    assert q_param.description.raw == desc
+
+    not_set = [
+        "default", "enum", "example", "max_length", "maximum",
+        "min_length", "minimum", "pattern", "repeat", "required"
+    ]
+    assert_not_set(q_param, not_set)
+
+    resp = res.responses[0]
+    assert resp.code == 200
+    assert resp.method == "get"
+    desc = ("No more than 10 pages returned")
+    assert resp.description.raw == desc
+
+    resp_header = resp.headers[0]
+    assert resp_header.name == "X-foo-header"
+    assert resp_header.method == "get"
+    assert resp_header.description.raw == "Some description for X-foo-header"
+    assert not res.responses[0].body

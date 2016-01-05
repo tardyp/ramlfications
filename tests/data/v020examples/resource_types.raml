@@ -188,6 +188,26 @@ resourceTypes:
         displayName: Secured Type
         description: Resource Type is secured
         securedBy: [ oauth_2_0 ]
+  - parameterType:
+      get:
+        description: A resource type with substitutable parameters
+        queryParameters:
+          <<queryParamName>>:
+            description: Return <<resourcePathName>> that have their <<queryParamName>> matching the given value
+          <<fallbackParamName>>:
+            description: If no values match the value given for <<queryParamName>>, use <<fallbackParamName>> instead
+  - inheritParameterTypeResourceAssigned:
+      type: { parameterType: { queryParamName: foo, fallbackParamName: bar } }
+      get:
+        description: Inherits parameterType resource type
+  - inheritParameterTypeMethodAssigned:
+      get:
+        type: { parameterType: { queryParamName: foo, fallbackParamName: bar } }
+        description: Inherits parameterType resource type
+  - typeWithParameterTrait:
+      get:
+        displayName: Resource Type with Parameter Trait
+        is: [ aParameterResourceTypeTrait: { maxPages: 10, aHeader: X-foo-header } ]
 traits:
   - aResourceTypeTrait:
       description: A trait to be assigned to a Resource Type
@@ -202,6 +222,17 @@ traits:
           default: foobar
           pattern: ^[a-zA-Z0-9][-a-zA-Z0-9]*$
           repeat: true
+  - aParameterResourceTypeTrait:
+      description: A trait to be assigned to a Resource Type with substitutable parameters
+      queryParameters:
+        numPages:
+          description: The number of pages to return, not to exceed <<maxPages>>
+      responses:
+        200:
+          description: No more than <<maxPages>> pages returned
+          headers:
+            <<aHeader>>:
+              description: some description for <<aHeader>>
 securitySchemes:
   - oauth_2_0:
       description: |
