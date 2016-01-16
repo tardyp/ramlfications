@@ -186,6 +186,15 @@ def create_response(code, data, root, method, inherited_resp=None):
         if inherited_resp.desc and not desc:
             desc = inherited_resp.desc
 
+    # when substituting `<<parameters>>`, everything gets turned into
+    # a string/unicode. Try to make it an int, and if not, validate.py
+    # will certainly catch it.
+    if isinstance(code, basestring):
+        try:
+            code = int(code)
+        except ValueError:
+            pass
+
     return Response(
         code=code,
         raw={code: data},
@@ -247,7 +256,6 @@ def create_responses(data, root, method, resource_types=None):
                                         method, data)
 
     for key, value in list(iteritems(responses)):
-
         response = create_response(key, value, root, method)
         response_objects.append(response)
     return sorted(response_objects, key=lambda x: x.code) or None
@@ -644,14 +652,15 @@ def create_resource_type_objects(param, data, v, method, root, is_):
         trait_data = _trait_data(param, root, is_)
         for t in trait_data:
             data = merge_dicts(data, t)
-        if data and isinstance(is_, dict):
-            json_data = json.dumps(data)
-            param_type = list(iterkeys(is_))[0]
-            param_data = list(itervalues(is_))[0]
-            for key, value in list(iteritems(param_data)):
-                json_data = _replace_str_attr(key, value, json_data)
-            if isinstance(json_data, str):
-                params = json.loads(json_data, objet_pairs_hook=OrderedDict)
+        for i in is_:
+            if data and isinstance(i, dict):
+                json_data = json.dumps(data)
+                param_type = list(iterkeys(i))[0]
+                param_data = list(itervalues(i))[0]
+                for key, value in list(iteritems(param_data)):
+                    json_data = _replace_str_attr(key, value, json_data)
+                if isinstance(json_data, str):
+                    data = json.loads(json_data, object_pairs_hook=OrderedDict)
     m_type, r_type = resolve_scalar(data, v, "type", None)
     type_ = m_type or r_type or None
     if type_:
@@ -667,24 +676,25 @@ def create_resource_type_objects(param, data, v, method, root, is_):
             if isinstance(json_data, str):
                 params = json.loads(json_data, object_pairs_hook=OrderedDict)
         if param == "body":
-            params = _create_res_type_body_objects(params, method, root,
-                                                   type_)
-        elif param == "responses":
-            params = _create_res_type_response_objects(params, method, root,
+            param_objs = _create_res_type_body_objects(params, method, root,
                                                        type_)
+        elif param == "responses":
+            param_objs = _create_res_type_response_objects(params, method,
+                                                           root, type_)
         else:
             object_name = __map_object(param)
-            params = __create_base_param_obj(params, object_name, root.config,
-                                             root.errors, method=method)
+            param_objs = __create_base_param_obj(params, object_name,
+                                                 root.config, root.errors,
+                                                 method=method)
     else:
         if param == "body":
-            params = create_bodies(data, method, root)
+            param_objs = create_bodies(data, method, root)
         elif param == "responses":
-            params = create_responses(data, root, method)
+            param_objs = create_responses(data, root, method)
         else:
-            params = create_param_objs(data, method, root.config, root.errors,
-                                       param)
-    return params or None
+            param_objs = create_param_objs(data, method, root.config,
+                                           root.errors, param)
+    return param_objs or None
 
 
 def merge_dicts(data, inherited_data, ret={}):

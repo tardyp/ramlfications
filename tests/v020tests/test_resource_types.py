@@ -694,5 +694,5 @@ def test_root_resource_types_inherit_parameter_trait(api):
     resp_header = resp.headers[0]
     assert resp_header.name == "X-foo-header"
     assert resp_header.method == "get"
-    assert resp_header.description.raw == "Some description for X-foo-header"
+    assert resp_header.description.raw == "some description for X-foo-header"
     assert not res.responses[0].body
