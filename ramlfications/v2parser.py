@@ -428,11 +428,19 @@ def create_resource_types(raml_data, root):
     for res in resource_types:
         for k, v in list(iteritems(res)):
             if isinstance(v, dict):
-                for meth in list(iterkeys(v)):
-                    if meth in accepted_methods:
+                values = list(iterkeys(v))
+                methods = [m for m in accepted_methods if m in values]
+                # it's possible for resource types to not define methods
+                if len(methods) == 0:
+                    meth = None
+                    resource = wrap(k, {}, meth, v)
+                    resource_type_objects.append(resource)
+                else:
+                    for meth in methods:
                         method_data = _get(v, meth, {})
                         resource = wrap(k, method_data, meth, v)
                         resource_type_objects.append(resource)
+            # is it ever not a dictionary?
             else:
                 meth = None
                 resource = wrap(k, {}, meth, v)

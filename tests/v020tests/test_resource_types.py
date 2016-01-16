@@ -13,6 +13,11 @@ from ramlfications._helpers import load_file
 
 from tests.base import V020EXAMPLES, assert_not_set
 
+#####
+# TODO: add tests re: assigning resource types to resources
+# once that functionality is added to parser.py
+#####
+
 
 @pytest.fixture(scope="session")
 def api():
@@ -25,13 +30,14 @@ def api():
 
 def test_create_resource_types(api):
     types = api.resource_types
-    assert len(types) == 12
+    assert len(types) == 13
 
     exp = [
         "base", "base", "inheritBase", "queryParamType", "formParamType",
         "typeWithTrait", "protocolsType", "securedByType", "parameterType",
         "inheritParameterTypeResourceAssigned",
-        "inheritParameterTypeMethodAssigned", "typeWithParameterTrait"
+        "inheritParameterTypeMethodAssigned", "typeWithParameterTrait",
+        "noMethodType"
     ]
     assert exp == [t.name for t in types]
 
@@ -696,3 +702,32 @@ def test_root_resource_types_inherit_parameter_trait(api):
     assert resp_header.method == "get"
     assert resp_header.description.raw == "some description for X-foo-header"
     assert not res.responses[0].body
+
+
+def test_resoource_type_no_method(api):
+    res = api.resource_types[12]
+
+    assert res.name == "noMethodType"
+    assert res.display_name == "noMethodType"
+    assert res.protocols == ["HTTPS"]
+    assert res.description.raw == "This type has no methods defined"
+    assert len(res.uri_params) == 1
+
+    not_set = [
+        "form_params", "headers", "type", "media_type", "secured_by",
+        "security_schemes", "usage", "body", "method", "is_", "type"
+    ]
+    assert_not_set(res, not_set)
+
+    uri = res.uri_params[0]
+    assert uri.name == "id"
+    assert uri.display_name == "id"
+    assert uri.description.raw == "some random ID"
+    assert uri.type == "string"
+    assert uri.required
+
+    not_set = [
+        "default", "enum", "example", "max_length", "maximum",
+        "min_length", "minimum", "pattern", "repeat"
+    ]
+    assert_not_set(uri, not_set)

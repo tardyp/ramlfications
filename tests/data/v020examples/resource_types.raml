@@ -208,6 +208,11 @@ resourceTypes:
       get:
         displayName: Resource Type with Parameter Trait
         is: [ aParameterResourceTypeTrait: { maxPages: 10, aHeader: X-foo-header } ]
+  - noMethodType:
+      description: This type has no methods defined
+      uriParameters:
+        id:
+          description: some random ID
 traits:
   - aResourceTypeTrait:
       description: A trait to be assigned to a Resource Type
@@ -295,3 +300,9 @@ securitySchemes:
       get:
         description: |
           [Get a Widget's Gizmos](https://developer.example.com/widget-gizmos/)
+/gizmos:
+  displayName: parent resource
+  /{id}:
+    type: noMethodType
+    get:
+      description: get a gizmo ID

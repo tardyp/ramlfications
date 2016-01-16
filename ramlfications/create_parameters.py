@@ -591,7 +591,10 @@ def _get_inherited_res_type_data(attr, types, name, method, root):
         res_type_raml = _get(res_type_raml[0], name, {})
         raw = _get(res_type_raml, method, None)
         if not raw:
-            raw = _get(res_type_raml, method + "?", {})
+            if method:
+                raw = _get(res_type_raml, method + "?", {})
+            else:
+                print(res_type_raml)
         attribute_data = _get(raw, attr, {})
         if res_type_raml.get("type"):
             inherited = _rename_me(attr, root, res_type_raml.get("type"),
