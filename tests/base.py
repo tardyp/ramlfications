@@ -26,3 +26,15 @@ def assert_not_set(obj, properties):
             msg = ("Attribute '{0}' is set in object '{1}' when should "
                    "not be.".format(p, obj))
             raise AssertNotSetError(msg)
+
+
+def assert_not_set_raises(obj, properties):
+    for p in properties:
+        try:
+            getattr(obj, p)
+            msg = ("Attribute '{0}' is set in object '{1}' when it "
+                   "should not be.".format(p, obj))
+            raise AssertNotSetError(msg)
+        # this check _should_ throw an attr error
+        except AttributeError:
+            continue
