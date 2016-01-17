@@ -20,7 +20,9 @@ from .parameters import (
     SecurityScheme
 )
 from .utils import load_schema
-from ._utils.common_utils import _get
+from ._utils.common_utils import (
+    _get, __get_inherited_trait_data, merge_dicts, __resource_type_data
+)
 from ._utils.parameter_utils import (
     _get_attribute, _get_scheme, _remove_duplicates, _get_inherited_item,
     _replace_str_attr
@@ -196,7 +198,7 @@ def create_resource_type_objects(param, data, v, method, root, is_, uri=None):
     if is_:
         trait_data = __trait_data(param, root, is_)
         for t in trait_data:
-            data = __merge_dicts(data, t)
+            data = merge_dicts(data, t)
         for i in is_:
             if data and isinstance(i, dict):
                 json_data = json.dumps(data)
@@ -211,7 +213,7 @@ def create_resource_type_objects(param, data, v, method, root, is_, uri=None):
     if type_:
         inherited = __resource_type_data(param, root, type_, method)
         params = _get(data, param, {})
-        params = __merge_dicts(params, inherited, ret={})
+        params = merge_dicts(params, inherited, ret={})
         if params and isinstance(type_, dict):
             json_data = json.dumps(params)
             param_type = type_
@@ -437,57 +439,11 @@ def __get_inherited_resource(res_name, resource_types):
 #####
 
 # <---[.create_resource_type_object helpers]--->
-def __resource_type_data(attr, root, res_type, method):
-    if not res_type:
-        return {}
-    raml = _get(root.raw, "resourceTypes")
-    return __get_inherited_res_type_data(attr, raml, res_type, method, root)
-
-
 def __trait_data(attr, root, _is):
     if not _is:
         return {}
     raml = _get(root.raw, "traits")
     return __get_inherited_trait_data(attr, raml, _is, root)
-
-
-def __get_inherited_res_type_data(attr, types, name, method, root):
-    if isinstance(name, dict):
-        name = list(iterkeys(name))[0]
-    res_type_raml = [r for r in types if list(iterkeys(r))[0] == name]
-    if res_type_raml:
-        res_type_raml = _get(res_type_raml[0], name, {})
-        raw = _get(res_type_raml, method, None)
-        if not raw:
-            if method:
-                raw = _get(res_type_raml, method + "?", {})
-            else:
-                print(res_type_raml)
-        attribute_data = _get(raw, attr, {})
-        if res_type_raml.get("type"):
-            inherited = __resource_type_data(attr, root,
-                                             res_type_raml.get("type"),
-                                             method)
-            attribute_data = __merge_dicts(attribute_data, inherited)
-        return attribute_data
-    return {}
-
-
-def __get_inherited_trait_data(attr, traits, name, root):
-    names = []
-    for n in name:
-        if isinstance(n, dict):
-            n = list(iterkeys(n))[0]
-        names.append(n)
-
-    trait_raml = [t for t in traits if list(iterkeys(t))[0] in names]
-    trait_data = []
-    for n in names:
-        for t in trait_raml:
-            t_raml = _get(t, n, {})
-            attribute_data = _get(t_raml, attr, {})
-            trait_data.append({attr: attribute_data})
-    return trait_data
 
 
 def __create_res_type_response_objects(data, method, root, to_replace):
@@ -520,34 +476,4 @@ def __create_res_type_body_objects(data, method, root, to_replace):
         body = create_body(k, v, root, method)
         body_objs.append(body)
     return body_objs
-
-
-def __merge_dicts(data, inherited_data, ret={}):
-    """
-    Returns a ``dict`` of attribute data that is merged from a resource
-    (node|type|trait) and its inherited data, giving preference to the
-    resource (node|type|trait) data over the
-    inherited data.
-    """
-    if not isinstance(data, dict):
-        return data
-    data_keys = list(iterkeys(data))
-    inherited_keys = list(iterkeys(inherited_data))
-
-    data_only = [d for d in data_keys if d not in inherited_keys]
-    inherit_only = [i for i in inherited_keys if i not in data_keys]
-    both = [d for d in data_keys if d in inherited_keys]
-
-    for d in data_only:
-        ret[d] = data.get(d)
-    for i in inherit_only:
-        ret[i] = inherited_data.get(i)
-
-    for b in both:
-        b_data = data.get(b)
-        b_inherited = inherited_data.get(b)
-        ret[b] = {}
-        ret[b] = __merge_dicts(b_data, b_inherited, ret[b])
-
-    return ret
 # </---[.create_resource_type_object helpers]--->

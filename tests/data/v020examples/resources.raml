@@ -1,0 +1,86 @@
+#%RAML 0.8
+title: Example Web API
+version: v1
+protocols: [ HTTPS ]
+baseUri: https://{subDomain}.example.com/{version}/{external_party}
+baseUriParameters:
+  subDomain:
+    description: subdomain of API server
+    example: sjc
+uriParameters:
+  external_party:
+    description: code of third-party partner
+    example: gizmo_co
+mediaType: application/json
+documentation:
+  - title: Example Web API Docs
+    content: |
+      Welcome to the _Example Web API_ demo specification. This is *not* the complete API
+      specification, and is meant for testing purposes within this RAML specification.
+resourceTypes:
+  - headerType:
+      description: This is the header type description
+      get?:
+        headers:
+          Accept:
+            description: An Acceptable header for get method
+            type: string
+      post?:
+        headers:
+          Accept:
+            description: An Acceptable header for post method
+            type: string
+/widgets:
+  displayName: several-widgets
+  type: headerType
+  get:
+    description: |
+      [Get Several Widgets](https://developer.example.com/widgets/)
+    headers:
+      X-Widgets-Header:
+        description: just an extra header for funsies
+    queryParameters:
+      ids:
+        displayName: Example Widget IDs
+        type: string
+        description: A comma-separated list of IDs
+        required: true
+        example: "widget1,widget2,widget3"
+/gizmos:
+  displayName: several-gizmos
+  post:
+    description: Post several gizmos
+    formParameters:
+      ids:
+        displayName: Example Gizmo IDs
+        type: string
+        description: A comma-separated list of IDs
+        required: true
+        example: "gizmo1,gizmo2,gizmo3"
+/thingys:
+  displayName: several-thingys
+  post:
+    description: Post several thingys
+    body:
+      application/json:
+        schema: {"name": "string"}
+        example: {"name": "Example Name"}
+      application/xml:
+        schema: |
+          <xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+            <xs:element name="thingy" type="thingyType" />
+            <xs:complexType name="thingyType">
+              <xs:sequence>
+                <xs:element type="xs:string" name="name" minOccurs="1" maxOccurs="1"/>
+              </xs:sequence>
+            </xs:complexType>
+          </xs:schema>
+      application/x-www-form-urlencoded:
+        formParameters:
+          foo:
+            displayName: Foo
+            description: The Foo Form Field
+            type: string
+            minLength: 5
+            maxLength: 50
+            default: foobar

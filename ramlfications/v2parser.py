@@ -14,12 +14,14 @@ from .errors import InvalidRAMLError
 from .parameters import (
     Documentation, SecurityScheme
 )
-from .raml import RootNode, ResourceTypeNode, TraitNode
+from .raml import RootNode, ResourceTypeNode, TraitNode, ResourceNode
 from .utils import load_schema
 
 # Private utility functions
 from ._utils.common_utils import _get
-from ._utils.parser_utils import resolve_scalar
+from ._utils.parser_utils import (
+    resolve_scalar, resolve_inherited_scalar, parse_assigned_dicts
+)
 from .create_parameters import (
     create_bodies, create_responses, create_security_schemes,
     create_uri_params_res_types, create_param_objs,
@@ -50,6 +52,7 @@ def parse_raml(loaded_raml, config):
     root.security_schemes = create_sec_schemes(root.raml_obj, root)
     root.traits = create_traits(root.raml_obj, root)
     root.resource_types = create_resource_types(root.raml_obj, root)
+    root.resources = create_resources(root.raml_obj, [], root, parent=None)
 
     if validate:
         attr.validate(root)  # need to validate again for root node
@@ -447,3 +450,218 @@ def create_resource_types(raml_data, root):
                 resource_type_objects.append(resource)
 
     return resource_type_objects or None
+
+
+def create_resources(node, resources, root, parent):
+    """
+    Recursively traverses the RAML file via DFS to find each resource
+    endpoint.
+
+    :param dict node: Dictionary of node to traverse
+    :param list resources: List of collected ``ResourceNode`` s
+    :param RootNode root: The ``RootNode`` of the API
+    :param ResourceNode parent: Parent ``ResourceNode`` of current ``node``
+    :returns: List of :py:class:`.raml.ResourceNode` objects.
+    """
+    avail = _get(root.config, "http_optional")
+    for k, v in list(iteritems(node)):
+        if k.startswith("/"):
+            methods = [m for m in avail if m in list(iterkeys(v))]
+            if methods:
+                for m in methods:
+                    child = create_node(name=k, raw_data=v, method=m,
+                                        parent=parent, root=root)
+                    resources.append(child)
+            else:
+                child = create_node(name=k, raw_data=v, method=None,
+                                    parent=parent, root=root)
+                resources.append(child)
+            resources = create_resources(child.raw, resources, root, child)
+    return resources
+
+
+def create_node(name, raw_data, method, parent, root):
+    """
+    Create a Resource Node object.
+
+    :param str name: Name of resource node
+    :param dict raw_data: Raw RAML data associated with resource node
+    :param str method: HTTP method associated with resource node
+    :param ResourceNode parent: Parent node object of resource node, if any
+    :param RootNode api: API ``RootNode`` that the resource node is attached to
+    :returns: :py:class:`.raml.ResourceNode` object
+    """
+    #####
+    # Node attribute functions
+    #####
+    def display_name(method_data, resource_data):
+        """Set display name of resource"""
+        m, r = resolve_scalar(method_data, resource_data, "displayName", None)
+        return m or r or name
+
+    def path():
+        """Set resource's relative URI path."""
+        parent_path = ""
+        if parent:
+            parent_path = parent.path
+        return parent_path + name
+
+    def absolute_uri(path, protocols):
+        """Set resource's absolute URI path."""
+        uri = root.base_uri + path
+        if protocols:
+            uri = uri.split("://")
+            if len(uri) == 2:
+                uri = uri[1]
+            if root.protocols:
+                # find shared protocols
+                _protos = list(set(root.protocols) & set(protocols))
+                # if resource protocols and root protocols share a protocol
+                # then use that one
+                if _protos:
+                    uri = _protos[0].lower() + "://" + uri
+                # if no shared protocols, use the first of the resource
+                # protocols
+                else:
+                    uri = protocols[0].lower() + "://" + uri
+        return uri
+
+    def protocols():
+        """Set resource's supported protocols."""
+        kwargs = dict(root=root,
+                      is_=assigned_traits,
+                      type_=assigned_type,
+                      method=method,
+                      data=raw_data,
+                      parent=parent)
+        # in order of preference:
+        objects_to_inherit = [
+            "method", "traits", "types", "resource", "parent"
+        ]
+        inherited = resolve_inherited_scalar("protocols", objects_to_inherit,
+                                             **kwargs)
+        default = [root.base_uri.split("://")[0].upper()]
+        return inherited or default
+
+    def media_type():
+        """Set resource's supported media types."""
+        if method is None:
+            return None
+        kw = dict(root=root,
+                  is_=assigned_traits,
+                  type_=assigned_type,
+                  method=method,
+                  data=raw_data)
+        # in order of preference:
+        objects_to_inherit = [
+            "method", "traits", "types", "resource", "root"
+        ]
+        return resolve_inherited_scalar("mediaType", objects_to_inherit, **kw)
+
+    def description():
+        """Set resource's description."""
+        kw = dict(method=method,
+                  data=raw_data,
+                  is_=assigned_traits,
+                  type_=assigned_type)
+        # in order of preferance:
+        objects_to_inherit = [
+            "method", "traits", "types", "resource"
+        ]
+        return resolve_inherited_scalar("description", objects_to_inherit,
+                                        **kw)
+
+    def is_(method_data, resource_data):
+        """Set resource's assigned trait names."""
+        m, r = resolve_scalar(method_data, resource_data, "is", [])
+        return m + r or None
+
+    def type_(method_data, resource_data):
+        """Set resource's assigned resource type name."""
+        m, r = resolve_scalar(method_data, resource_data, "type", {})
+        return m or r or None
+
+    def secured_by():
+        """
+        Set resource's assigned security scheme names and related paramters.
+        """
+        kw = dict(method=method, data=raw_data, root=root)
+        objects_to_inherit = ["method", "resource", "root"]
+        return resolve_inherited_scalar("securedBy", objects_to_inherit, **kw)
+
+    def headers(method_data, resource_data):
+        return create_resource_type_objects("headers", method_data,
+                                            resource_data, method,
+                                            root, resource_is)
+
+    def body(method_data, resource_data):
+        return create_resource_type_objects("body", method_data,
+                                            resource_data, method,
+                                            root, resource_is)
+
+    def responses():
+        pass
+
+    def uri_params():
+        pass
+
+    def base_uri_params():
+        pass
+
+    def query_params(method_data, resource_data):
+        return create_resource_type_objects("queryParameters", method_data,
+                                            resource_data, method,
+                                            root, resource_is)
+
+    def form_params(method_data, resource_data):
+        return create_resource_type_objects("formParameters", method_data,
+                                            resource_data, method,
+                                            root, resource_is)
+
+    def traits():
+        pass
+
+    def resource_type():
+        pass
+
+    def security_schemes():
+        pass
+
+    # Avoiding repeated function calls by calling them once here
+    method_data = _get(raw_data, method, {})
+    resource_is = is_(method_data, raw_data)
+    resource_type_ = type_(method_data, raw_data)
+    secured = secured_by()
+
+    assigned_traits = parse_assigned_dicts(resource_is)
+    assigned_type = parse_assigned_dicts(resource_type_)
+    resource_path = path()
+    resource_protocols = protocols()
+
+    return ResourceNode(
+        name=name,
+        raw=raw_data,
+        method=method,
+        parent=parent,
+        root=root,
+        display_name=display_name(method_data, raw_data),
+        path=resource_path,
+        absolute_uri=absolute_uri(resource_path, resource_protocols),
+        protocols=resource_protocols,
+        headers=headers(method_data, raw_data),
+        body=body(method_data, raw_data),
+        responses=responses(),
+        uri_params=uri_params(),
+        base_uri_params=base_uri_params(),
+        query_params=query_params(method_data, raw_data),
+        form_params=form_params(method_data, raw_data),
+        media_type=media_type(),
+        desc=description(),
+        is_=resource_is,
+        traits=traits(),
+        type=resource_type_,
+        resource_type=resource_type(),
+        secured_by=secured,
+        security_schemes=security_schemes(),
+        errors=root.errors
+    )
