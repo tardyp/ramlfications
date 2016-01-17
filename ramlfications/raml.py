@@ -3,17 +3,12 @@
 
 from __future__ import absolute_import, division, print_function
 
-import copy
-
 import attr
-from six import iteritems
 from six.moves import BaseHTTPServer as httpserver  # NOQA
 
 from .parameters import Content
 from .validate import *  # NOQA
 
-from ._utils.parser_utils import _remove_duplicates
-from ._utils.parameter_utils import _replace_str_attr
 
 HTTP_RESP_CODES = httpserver.BaseHTTPRequestHandler.responses.keys()
 AVAILABLE_METHODS = [
@@ -221,115 +216,3 @@ class ResourceNode(BaseNode):
     resource_type    = attr.ib(repr=False)
     secured_by       = attr.ib(repr=False)
     security_schemes = attr.ib(repr=False)
-
-    def _inherit_type(self):
-        for p in METHOD_PROPERTIES:
-            try:
-                inherited_prop = getattr(self.resource_type, p)
-                resource_prop = getattr(self, p)
-            except AttributeError:
-                # this won't be valid when validating
-                return
-
-            if resource_prop and inherited_prop:
-
-                for r in resource_prop:
-                    r._inherit_type_properties(inherited_prop)
-
-    def _inherit_type_test(self):
-        for p in RESOURCE_PROPERTIES:
-            inherited_prop = getattr(self.resource_type, p, False)
-            if inherited_prop:
-                inherited_copy = copy.deepcopy(inherited_prop)
-                res_prop = getattr(self, p)
-                if not res_prop:
-                    setattr(self, p, inherited_copy)
-                # list of query, uri, etc
-                if isinstance(res_prop, list):
-                    if isinstance(inherited_copy, list):
-                        ret = _remove_duplicates(inherited_copy, res_prop)
-                        setattr(self, p, ret)
-                        # res_prop.extend(inherited_copy)
-
-                    else:
-                        res_prop.append(inherited_copy)
-
-    def _inherit_trait_objects(self):
-        if not self.traits:
-            return  # this should be invalid
-        for t in self.traits:
-            for p in RESOURCE_PROPERTIES:
-                inherited_prop = getattr(t, p, False)
-                if inherited_prop:
-                    res_prop = getattr(self, p)
-                    if not res_prop:
-                        setattr(self, p, inherited_prop)
-                    # list of query, uri, etc
-                    if isinstance(res_prop, list):
-                        if isinstance(inherited_prop, list):
-                            for i in inherited_prop:
-                                if i not in res_prop:
-                                    res_prop.append(i)
-                        else:
-                            if inherited_prop not in res_prop:
-                                res_prop.append(inherited_prop)
-
-    def _parse_trait_parameters(self):
-        to_parse = []
-        for t in self.is_:
-            if isinstance(t, dict):
-                for trait, param in list(iteritems(t)):
-                    # get trait object
-                    trait_obj = [t for t in self.traits if t.name == trait][0]
-                    # get parameter name & value
-                    for k, v in list(iteritems(param)):
-                        to_parse.append(dict(name=k, value=v, obj=trait_obj))
-                    to_parse.append(dict(name="methodName",
-                                         value=self.method,
-                                         obj=trait_obj))
-                    to_parse.append(dict(name="resourcePath",
-                                         value=self.name,
-                                         obj=trait_obj))
-                    to_parse.append(dict(name="resourcePathName",
-                                         value=self.name[1:],
-                                         obj=trait_obj))
-        self._update_parameters(to_parse, RESOURCE_PROPERTIES)
-
-    def _parse_resource_type_parameters(self):
-        to_parse = []
-        if not self.resource_type:
-            return
-        if isinstance(self.type, dict):
-            for key, value in list(iteritems(self.type)):
-                # note: not sure what else 'value' could be...
-                # but just being safe...
-                if isinstance(value, dict):
-                    for param, v in list(iteritems(value)):
-                        to_parse.append(dict(name=param, value=v,
-                                             obj=self.resource_type))
-
-        to_parse.append(dict(name="resourcePath",
-                             value=self.name,
-                             obj=self.resource_type))
-        to_parse.append(dict(name="resourcePathName",
-                             value=self.name[1:],
-                             obj=self.resource_type))
-        self._update_parameters(to_parse, RESOURCE_PROPERTIES)
-
-    def _update_parameters(self, to_parse, properties):
-        for item in to_parse:
-            obj = item.get("obj")
-            name = item.get("name")
-            value = item.get("value")
-
-            for p in properties:
-                props = getattr(obj, p)
-                if props:
-                    for i in props:
-                        if not isinstance(i, list):
-                            i._substitute_parameters(i, name, value)
-
-            desc = getattr(obj, "desc")
-            if desc:
-                if "resourcePath" in desc or "resourcePathName" in desc:
-                    self.desc = _replace_str_attr(name, value, desc)

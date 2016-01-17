@@ -19,11 +19,11 @@ from .utils import load_schema
 
 # Private utility functions
 from ._utils.common_utils import _get
-
+from ._utils.parser_utils import resolve_scalar
 from .create_parameters import (
-    create_bodies, create_responses,
-    create_security_schemes, create_uri_params_res_types, create_param_objs,
-    create_resource_type_objects, resolve_scalar
+    create_bodies, create_responses, create_security_schemes,
+    create_uri_params_res_types, create_param_objs,
+    create_resource_type_objects
 )
 
 

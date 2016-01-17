@@ -13,7 +13,7 @@ __description__ = "A Python RAML parser"
 
 
 from ramlfications.config import setup_config
-from ramlfications.parser import parse_raml
+from ramlfications.v2parser import parse_raml
 
 from ramlfications._helpers import load_file, load_string
 

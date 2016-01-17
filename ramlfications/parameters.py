@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function
 import attr
 import markdown2 as md
 
-from ._utils import parameter_utils as pu
 from .validate import *  # NOQA
 
 
@@ -104,13 +103,6 @@ class BaseParameter(object):
         if self.desc:
             return Content(self.desc)
         return None
-
-    def _inherit_type_properties(self, inherited_param):
-        pu._inherit_type_properties(self, inherited_param, NAMED_PARAMS)
-
-    def _substitute_parameters(self, obj, name, value):
-        params = ["name", "raw"] + NAMED_PARAMS
-        pu._substitute_parameters(obj, name, value, params)
 
 
 @attr.s
@@ -237,14 +229,6 @@ class Header(object):
             return Content(self.desc)
         return None
 
-    def _inherit_type_properties(self, inherited_param):
-        params = ["method"] + NAMED_PARAMS
-        pu._inherit_type_properties(self, inherited_param, params)
-
-    def _substitute_parameters(self, obj, name, value):
-        params = ["name", "raw", "method"] + NAMED_PARAMS
-        pu._substitute_parameters(obj, name, value, params)
-
 
 @attr.s
 class Body(object):
@@ -275,14 +259,6 @@ class Body(object):
                           validator=attr.validators.instance_of(dict))
     errors      = attr.ib(repr=False)
 
-    def _inherit_type_properties(self, inherited_param):
-        named_params = ["schema", "example", "form_params"]
-        pu._inherit_type_properties(self, inherited_param, named_params)
-
-    def _substitute_parameters(self, obj, name, value):
-        params = ["mime_type", "raw", "schema", "example", "form_params"]
-        pu._substitute_parameters(obj, name, value, params)
-
 
 @attr.s
 class Response(object):
@@ -312,31 +288,6 @@ class Response(object):
         if self.desc:
             return Content(self.desc)
         return None
-
-    def _inherit_type_properties(self, inherited_param):
-        params = NAMED_PARAMS + ["headers", "body"]
-        pu._inherit_type_properties(self, inherited_param, params)
-        recurse_objs = ["headers", "body"]
-        for r in recurse_objs:
-            r_objs = getattr(self, r)
-            if r_objs:
-                for o in r_objs:
-                    o._inherit_type_properties(inherited_param)
-
-    def _substitute_parameters(self, obj, name, value):
-        params = ["code", "raw", "desc", "method"]
-        for s in params:
-            current_value = getattr(self, s)
-            if current_value:
-                if isinstance(current_value, str):
-                    new_value = pu._replace_str_attr(name, value, current_value)
-                    setattr(obj, s, new_value)
-        recurse_objs = ["headers", "body"]
-        for r in recurse_objs:
-            r_objs = getattr(self, r)
-            if r_objs:
-                for o in r_objs:
-                    o._substitute_parameters(o, name, value)
 
 
 @attr.s
