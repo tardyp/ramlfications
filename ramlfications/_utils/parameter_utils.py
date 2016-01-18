@@ -98,8 +98,9 @@ def __get_inherited_type_data(data, resource_types):
 # TODO: can I clean up/get rid of this? only used once here
 def __get_inherited_resource(res_name, resource_types):
     for resource in resource_types:
-        if res_name == list(iterkeys(resource))[0]:
-            return resource
+        if isinstance(resource, dict):
+            if res_name == list(iterkeys(resource))[0]:
+                return resource
 
 
 def __get_res_type_attribute(res_data, method_data, item, default={}):

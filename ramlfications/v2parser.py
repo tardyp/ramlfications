@@ -23,7 +23,7 @@ from ._utils.parser_utils import (
     resolve_scalar, resolve_inherited_scalar, parse_assigned_dicts
 )
 from .create_parameters import (
-    create_bodies, create_responses, create_security_schemes,
+    create_bodies, create_responses,
     create_uri_params_res_types, create_param_objs,
     create_resource_type_objects
 )
@@ -394,9 +394,14 @@ def create_resource_types(raml_data, root):
 
     def security_schemes_(method_data, resource_data):
         secured = secured_by(method_data, resource_data)
-        if secured:
-            return create_security_schemes(secured, root)
-        return None
+        secured = parse_assigned_dicts(secured)
+        if secured and root.security_schemes:
+            sec_objs = []
+            for sec in secured:
+                obj = [s for s in root.security_schemes if s.name == sec]
+                if obj:
+                    sec_objs.append(obj[0])
+            return sec_objs or None
 
     def wrap(key, method_data, meth, resource_data):
         return ResourceTypeNode(
@@ -528,12 +533,8 @@ def create_node(name, raw_data, method, parent, root):
 
     def protocols():
         """Set resource's supported protocols."""
-        kwargs = dict(root=root,
-                      is_=assigned_traits,
-                      type_=assigned_type,
-                      method=method,
-                      data=raw_data,
-                      parent=parent)
+        kwargs = dict(root=root, is_=assigned_traits, type_=assigned_type,
+                      method=method, data=raw_data, parent=parent)
         # in order of preference:
         objects_to_inherit = [
             "method", "traits", "types", "resource", "parent"
@@ -547,11 +548,8 @@ def create_node(name, raw_data, method, parent, root):
         """Set resource's supported media types."""
         if method is None:
             return None
-        kw = dict(root=root,
-                  is_=assigned_traits,
-                  type_=assigned_type,
-                  method=method,
-                  data=raw_data)
+        kw = dict(root=root, is_=assigned_traits, type_=assigned_type,
+                  method=method, data=raw_data)
         # in order of preference:
         objects_to_inherit = [
             "method", "traits", "types", "resource", "root"
@@ -560,9 +558,7 @@ def create_node(name, raw_data, method, parent, root):
 
     def description():
         """Set resource's description."""
-        kw = dict(method=method,
-                  data=raw_data,
-                  is_=assigned_traits,
+        kw = dict(method=method, data=raw_data, is_=assigned_traits,
                   type_=assigned_type)
         # in order of preferance:
         objects_to_inherit = [
@@ -599,14 +595,40 @@ def create_node(name, raw_data, method, parent, root):
                                             resource_data, method,
                                             root, resource_is)
 
-    def responses():
-        pass
+    def responses(method_data, resource_data):
+        return create_resource_type_objects("responses", method_data,
+                                            resource_data, method,
+                                            root, resource_is)
 
-    def uri_params():
-        pass
+    # TODO: clean me!!
+    # TODO: preserve order of URIs
+    def uri_params(method_data, resource_data):
+        params = create_uri_params_res_types(method_data, resource_data,
+                                             method, root, resource_type_)
+        if not params:
+            params = []
+        kw = dict(root=root, parent=parent, method=method_data,
+                  resource=resource_data)
+        m_data = resolve_inherited_scalar("uriParameters", ["method"], **kw)
+        r_data = resolve_inherited_scalar("uriParameters", ["resource"], **kw)
+        p_data = resolve_inherited_scalar("uriParameters", ["parent"], **kw)
+        root_data = resolve_inherited_scalar("uriParameters", ["root"], **kw)
+        if m_data:
+            params.extend(m_data)
+        if r_data:
+            params.extend(r_data)
+        if p_data:
+            params.extend(p_data)
+        if root_data:
+            params.extend(root_data)
+        return params
 
-    def base_uri_params():
-        pass
+    def base_uri_params(method_data, resource_data):
+        kw = dict(root=root, parent=parent, method=method_data,
+                  resource=resource_data)
+        objects_to_inherit = ["method", "resource", "parent", "root"]
+        return resolve_inherited_scalar("baseUriParameters",
+                                        objects_to_inherit, **kw)
 
     def query_params(method_data, resource_data):
         return create_resource_type_objects("queryParameters", method_data,
@@ -619,13 +641,32 @@ def create_node(name, raw_data, method, parent, root):
                                             root, resource_is)
 
     def traits():
-        pass
+        """Set resource's assigned trait objects."""
+        if assigned_traits and root.traits:
+            trait_objs = []
+            for trait in assigned_traits:
+                obj = [t for t in root.traits if t.name == trait]
+                if obj:
+                    trait_objs.append(obj[0])
+            return trait_objs or None
 
     def resource_type():
-        pass
+        """Set resource's assigned resource type objects."""
+        if resource_type_ and root.resource_types:
+            res_types = root.resource_types
+            type_obj = [r for r in res_types if r.name == assigned_type]
+            type_obj = [r for r in type_obj if r.method == method]
+            if type_obj:
+                return type_obj[0]
 
     def security_schemes():
-        pass
+        if assigned_sec_schemes and root.security_schemes:
+            sec_objs = []
+            for sec in assigned_sec_schemes:
+                obj = [s for s in root.security_schemes if s.name == sec]
+                if obj:
+                    sec_objs.append(obj[0])
+            return sec_objs or None
 
     # Avoiding repeated function calls by calling them once here
     method_data = _get(raw_data, method, {})
@@ -635,8 +676,10 @@ def create_node(name, raw_data, method, parent, root):
 
     assigned_traits = parse_assigned_dicts(resource_is)
     assigned_type = parse_assigned_dicts(resource_type_)
+    assigned_sec_schemes = parse_assigned_dicts(secured)
     resource_path = path()
     resource_protocols = protocols()
+    absolute_uri_ = absolute_uri(resource_path, resource_protocols)
 
     return ResourceNode(
         name=name,
@@ -646,13 +689,13 @@ def create_node(name, raw_data, method, parent, root):
         root=root,
         display_name=display_name(method_data, raw_data),
         path=resource_path,
-        absolute_uri=absolute_uri(resource_path, resource_protocols),
+        absolute_uri=absolute_uri_,
         protocols=resource_protocols,
         headers=headers(method_data, raw_data),
         body=body(method_data, raw_data),
-        responses=responses(),
-        uri_params=uri_params(),
-        base_uri_params=base_uri_params(),
+        responses=responses(method_data, raw_data),
+        uri_params=uri_params(method_data, raw_data),
+        base_uri_params=base_uri_params(method_data, raw_data),
         query_params=query_params(method_data, raw_data),
         form_params=form_params(method_data, raw_data),
         media_type=media_type(),

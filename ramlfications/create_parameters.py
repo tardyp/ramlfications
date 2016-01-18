@@ -62,7 +62,7 @@ def create_param_objs(data, method, conf, errs, param_type, types=False,
                                      method=method)
     if not uri:
         return params or None
-    return _create_uri_params(uri, params, conf, errs, base=base,
+    return _create_uri_params(uri, params, param_type, conf, errs, base=base,
                               root=root, raml=raml)
 
 
@@ -166,6 +166,7 @@ def create_security_scheme(scheme, data, root):
     )
 
 
+# TODO: not used anymore in v2parser.py
 def create_security_schemes(secured_by, root):
     """
     Returns a list of ``.parameters.SecurityScheme`` objects.
@@ -261,20 +262,46 @@ def create_uri_params_res_types(data, raw_data, method, root, inherit=False):
 # Private, helper functions
 #
 ############################
-def _create_uri_params(uri, params, conf, errs, base=None, root=None,
-                       raml=None):
+# TODO: clean me! i'm ugly!
+def _create_uri_params(uri, params, param_type, conf, errs, base=None,
+                       root=None, raml=None):
     declared = []
+    param_names = []
+    to_ignore = []
+    if params:
+        param_names = [p.name for p in params]
+        declared.extend(params)
     if base:
-        declared = [p.name for p in base]
+        base_params = [p for p in base if p.name not in param_names]
+        base_param_names = [p.name for p in base_params]
+        param_names.extend(base_param_names)
+
+        if param_type == "uriParameters":
+            to_ignore.extend(base_param_names)
     if raml:
-        declared = _get(raml, "uriParameters", {})
-        declared = list(iterkeys(declared))
+        if param_type == "uriParameters":
+            _to_ignore = list(iterkeys(_get(raml, "baseUriParameters", {})))
+            to_ignore.extend(_to_ignore)
+        if param_type == "baseUriParameters":
+            _to_ignore = list(iterkeys(_get(raml, "uriParameters", {})))
+            to_ignore.extend(_to_ignore)
     if root:
         if root.uri_params:
-            declared = [p.name for p in root.uri_params]
+            _params = root.uri_params
+            root_uri = [p for p in _params if p.name not in param_names]
+            declared.extend(root_uri)
+            root_uri_names = [p.name for p in root_uri]
+            param_names.extend(root_uri_names)
+            if param_type == "baseUriParameters":
+                to_ignore.extend(root_uri_names)
         if root.base_uri_params:
-            declared.extend([p.name for p in root.base_uri_params])
-    return __preserve_uri_order(uri, params, conf, errs, declared)
+            _params = root.base_uri_params
+            root_base_uri = [p for p in _params if p.name not in param_names]
+            root_base_uri_names = [p.name for p in root_base_uri]
+            param_names.extend(root_base_uri_names)
+            if param_type == "uriParameters":
+                to_ignore.extend(root_base_uri_names)
+    return __preserve_uri_order(uri, params, conf, errs, declared, to_ignore)
 
 
 def _create_response_headers(data, method, root):
@@ -352,10 +379,12 @@ def __create_base_param_obj(attribute_data, param_obj, config, errors, **kw):
     return objects or None
 
 
-def __add_missing_uri_params(missing, param_objs, config, errors):
+def __add_missing_uri_params(missing, param_objs, config, errors, to_ignore):
     for m in missing:
         # no need to create a URI param for version
         # or should we?
+        if m in to_ignore:
+            continue
         if m == "version":
             continue
         data = {m: {"type", "string"}}
@@ -366,7 +395,8 @@ def __add_missing_uri_params(missing, param_objs, config, errors):
 
 # preserve order of URI and Base URI parameters
 # used for RootNode, ResourceNode
-def __preserve_uri_order(path, param_objs, config, errors, declared=[]):
+def __preserve_uri_order(path, param_objs, config, errors, declared=[],
+                         to_ignore=[]):
     # if this is hit, RAML shouldn't be valid anyways.
     if isinstance(path, list):
         path = path[0]
@@ -387,7 +417,7 @@ def __preserve_uri_order(path, param_objs, config, errors, declared=[]):
         # exclude any (base)uri params if already declared
         missing = [p for p in missing if p not in declared]
         param_objs = __add_missing_uri_params(missing, param_objs,
-                                              config, errors)
+                                              config, errors, to_ignore)
 
     sorted_params = []
     for p in params:
@@ -429,8 +459,9 @@ def __get_inherited_type_params(data, attribute, params, resource_types):
 
 def __get_inherited_resource(res_name, resource_types):
     for resource in resource_types:
-        if res_name == list(iterkeys(resource))[0]:
-            return resource
+        if isinstance(resource, dict):
+            if res_name == list(iterkeys(resource))[0]:
+                return resource
 # </--[.create_uri_params_res_types helpers]-->
 
 
