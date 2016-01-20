@@ -75,33 +75,20 @@ def __resource_type_data(attr, root, res_type, method):
                                              method, root)
 
 
-def merge_dicts(data, inherited_data, ret={}):
-    """
-    Returns a ``dict`` of attribute data that is merged from a resource
-    (node|type|trait) and its inherited data, giving preference to the
-    resource (node|type|trait) data over the
-    inherited data.
-    """
-    if not isinstance(data, dict):
-        return data
-    data_keys = list(iterkeys(data))
-    if not inherited_data:
-        return data
-    inherited_keys = list(iterkeys(inherited_data))
-
-    data_only = [d for d in data_keys if d not in inherited_keys]
-    inherit_only = [i for i in inherited_keys if i not in data_keys]
-    both = [d for d in data_keys if d in inherited_keys]
-
-    for d in data_only:
-        ret[d] = data.get(d)
-    for i in inherit_only:
-        ret[i] = inherited_data.get(i)
-
-    for b in both:
-        b_data = data.get(b)
-        b_inherited = inherited_data.get(b)
-        ret[b] = {}
-        ret[b] = merge_dicts(b_data, b_inherited, ret[b])
-
-    return ret
+def merge_dicts(child, parent, path=[]):
+    "merges parent into child"
+    if path is None:
+        path = []
+    if not parent:
+        return child
+    for key in parent:
+        if key in child:
+            if isinstance(child[key], dict) and isinstance(parent[key], dict):
+                merge_dicts(child[key], parent[key], path + [str(key)])
+            elif child[key] == parent[key]:
+                pass  # same leaf value
+            else:
+                print('Conflict at %s' % '.'.join(path + [str(key)]))
+        else:
+            child[key] = parent[key]
+    return child

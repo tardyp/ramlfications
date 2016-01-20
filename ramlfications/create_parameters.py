@@ -181,7 +181,7 @@ def create_security_schemes(secured_by, root):
     return secured_objects
 
 
-def create_resource_type_objects(param, data, v, method, root, is_, uri=None):
+def create_resource_objects(param, data, v, method, root, is_, uri=None):
     """
     Returns a list of ``.parameter`` objects as designated by ``param``
     from the given ``data``. Will parse data the object inherits if
@@ -214,7 +214,7 @@ def create_resource_type_objects(param, data, v, method, root, is_, uri=None):
     if type_:
         inherited = __resource_type_data(param, root, type_, method)
         params = _get(data, param, {})
-        params = merge_dicts(params, inherited, ret={})
+        params = merge_dicts(params, inherited)
         if params and isinstance(type_, dict):
             json_data = json.dumps(params)
             param_type = type_

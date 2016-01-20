@@ -25,7 +25,7 @@ from ._utils.parser_utils import (
 from .create_parameters import (
     create_bodies, create_responses,
     create_uri_params_res_types, create_param_objs,
-    create_resource_type_objects
+    create_resource_objects
 )
 
 
@@ -304,20 +304,20 @@ def create_resource_types(raml_data, root):
 
     def headers(method_data, resource_data):
         _is = is_(method_data, resource_data)
-        return create_resource_type_objects("headers", method_data,
-                                            resource_data, method(meth),
-                                            root, _is)
+        return create_resource_objects("headers", method_data,
+                                       resource_data, method(meth),
+                                       root, _is)
 
     def body(method_data, resource_data):
         _is = is_(method_data, resource_data)
-        return create_resource_type_objects("body", method_data, resource_data,
-                                            method(meth), root, _is)
+        return create_resource_objects("body", method_data, resource_data,
+                                       method(meth), root, _is)
 
     def responses(method_data, resource_data):
         _is = is_(method_data, resource_data)
-        return create_resource_type_objects("responses", method_data,
-                                            resource_data, method(meth),
-                                            root, _is)
+        return create_resource_objects("responses", method_data,
+                                       resource_data, method(meth),
+                                       root, _is)
 
     def uri_params(method_data, resource_data):
         inherit = False
@@ -328,21 +328,21 @@ def create_resource_types(raml_data, root):
 
     def base_uri_params(method_data, resource_data):
         _is = is_(method_data, resource_data)
-        return create_resource_type_objects("baseUriParameters", method_data,
-                                            resource_data, method(meth),
-                                            root, _is)
+        return create_resource_objects("baseUriParameters", method_data,
+                                       resource_data, method(meth),
+                                       root, _is)
 
     def query_params(method_data, resource_data):
         _is = is_(method_data, resource_data)
-        return create_resource_type_objects("queryParameters", method_data,
-                                            resource_data, method(meth),
-                                            root, _is)
+        return create_resource_objects("queryParameters", method_data,
+                                       resource_data, method(meth),
+                                       root, _is)
 
     def form_params(method_data, resource_data):
         _is = is_(method_data, resource_data)
-        return create_resource_type_objects("formParameters", method_data,
-                                            resource_data, method(meth),
-                                            root, _is)
+        return create_resource_objects("formParameters", method_data,
+                                       resource_data, method(meth),
+                                       root, _is)
 
     def description(method_data, resource_data):
         m, r = resolve_scalar(method_data, resource_data, "description",
@@ -586,19 +586,19 @@ def create_node(name, raw_data, method, parent, root):
         return resolve_inherited_scalar("securedBy", objects_to_inherit, **kw)
 
     def headers(method_data, resource_data):
-        return create_resource_type_objects("headers", method_data,
-                                            resource_data, method,
-                                            root, resource_is)
+        return create_resource_objects("headers", method_data,
+                                       resource_data, method,
+                                       root, resource_is)
 
     def body(method_data, resource_data):
-        return create_resource_type_objects("body", method_data,
-                                            resource_data, method,
-                                            root, resource_is)
+        return create_resource_objects("body", method_data,
+                                       resource_data, method,
+                                       root, resource_is)
 
     def responses(method_data, resource_data):
-        return create_resource_type_objects("responses", method_data,
-                                            resource_data, method,
-                                            root, resource_is)
+        return create_resource_objects("responses", method_data,
+                                       resource_data, method,
+                                       root, resource_is)
 
     # TODO: clean me!!
     # TODO: preserve order of URIs
@@ -631,14 +631,14 @@ def create_node(name, raw_data, method, parent, root):
                                         objects_to_inherit, **kw)
 
     def query_params(method_data, resource_data):
-        return create_resource_type_objects("queryParameters", method_data,
-                                            resource_data, method,
-                                            root, resource_is)
+        return create_resource_objects("queryParameters", method_data,
+                                       resource_data, method,
+                                       root, resource_is)
 
     def form_params(method_data, resource_data):
-        return create_resource_type_objects("formParameters", method_data,
-                                            resource_data, method,
-                                            root, resource_is)
+        return create_resource_objects("formParameters", method_data,
+                                       resource_data, method,
+                                       root, resource_is)
 
     def traits():
         """Set resource's assigned trait objects."""

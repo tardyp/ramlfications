@@ -161,9 +161,9 @@ def test_headers(api):
     assert len(res.headers) == 2
 
     h = res.headers[0]
-    assert h.name == "Accept"
-    assert h.display_name == "Accept"
-    assert h.description.raw == "An Acceptable header for get method"
+    assert h.name == "X-Widgets-Header"
+    assert h.display_name == "X-Widgets-Header"
+    assert h.description.raw == "just an extra header for funsies"
     assert h.method == "get"
     assert h.type == "string"
     not_set = [
@@ -173,9 +173,9 @@ def test_headers(api):
     assert_not_set(h, not_set)
 
     h = res.headers[1]
-    assert h.name == "X-Widgets-Header"
-    assert h.display_name == "X-Widgets-Header"
-    assert h.description.raw == "just an extra header for funsies"
+    assert h.name == "Accept"
+    assert h.display_name == "Accept"
+    assert h.description.raw == "An Acceptable header for get method"
     assert h.method == "get"
     assert h.type == "string"
     not_set = [

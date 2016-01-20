@@ -191,13 +191,13 @@ def test_root_resource_types_inherit_base(api):
     ]
     assert_not_set(header, not_set)
 
-    json_body = inherit_base.body[0]
+    json_body = inherit_base.body[1]
     assert json_body.mime_type == "application/json"
     assert json_body.schema == {"name": "string"}
     assert json_body.example == {"name": "Foo Bar"}
     assert not json_body.form_params
 
-    form_body = inherit_base.body[1]
+    form_body = inherit_base.body[0]
     assert form_body.mime_type == "application/x-www-form-urlencoded"
     assert len(form_body.form_params) == 1
     assert not form_body.schema
@@ -704,7 +704,7 @@ def test_root_resource_types_inherit_parameter_trait(api):
     assert not res.responses[0].body
 
 
-def test_resoource_type_no_method(api):
+def test_resource_type_no_method(api):
     res = api.resource_types[12]
 
     assert res.name == "noMethodType"
