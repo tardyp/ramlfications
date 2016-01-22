@@ -30,16 +30,24 @@ def _get(data, item, default=None):
 
 
 def __get_inherited_res_type_data(attr, types, name, method, root):
+    res_level = [
+        "baseUriParameters", "uriParameters", "uri_params", "base_uri_params"
+    ]
     if isinstance(name, dict):
         name = list(iterkeys(name))[0]
     res_type_raml = [r for r in types if list(iterkeys(r))[0] == name]
+    if attr == "uri_params":
+        attr = "uriParameters"
     if res_type_raml:
         res_type_raml = _get(res_type_raml[0], name, {})
         raw = _get(res_type_raml, method, None)
         if not raw:
             if method:
                 raw = _get(res_type_raml, method + "?", {})
+
         attribute_data = _get(raw, attr, {})
+        if not attribute_data and attr in res_level:
+            attribute_data = _get(res_type_raml, attr, {})
         if res_type_raml.get("type"):
             inherited = __resource_type_data(attr, root,
                                              res_type_raml.get("type"),

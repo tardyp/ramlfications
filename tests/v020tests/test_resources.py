@@ -336,9 +336,7 @@ def test_uri_params(api):
     assert len(res.uri_params) == 1
 
     u = res.uri_params[0]
-    print(u)
     assert u.name == "external_party"
-    print(u.description)
     assert u.display_name == "external_party"
     assert u.description.raw == "code of third-party partner"
     assert u.example == "gizmo_co"
@@ -355,7 +353,6 @@ def test_uri_params(api):
 
     u = res.uri_params[1]
     assert u.name == "external_party"
-    print(u.description)
     assert u.display_name == "external_party"
     assert u.description.raw == "code of third-party partner"
     assert u.example == "gizmo_co"

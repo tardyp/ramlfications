@@ -24,17 +24,17 @@ from ._utils.common_utils import (
     _get, __get_inherited_trait_data, merge_dicts, __resource_type_data
 )
 from ._utils.parameter_utils import (
-    _get_attribute, _get_scheme, _remove_duplicates, _get_inherited_item,
-    _replace_str_attr
+    _get_scheme, _remove_duplicates, _replace_str_attr
 )
-from ._utils.parser_utils import resolve_scalar
+from ._utils.parser_utils import (
+    resolve_scalar, resolve_scalar_data
+)
 
 
 #####
 # Public functions
 #####
-def create_param_objs(data, method, conf, errs, param_type, types=False,
-                      uri=False, base=None, root=None, raml=None):
+def create_param_objs(param_type, resolve=[], **kwargs):
     """
     General function to create ``.parameters`` objects. Returns a list of
     ``.parameters`` objects or ``None``.
@@ -53,17 +53,41 @@ def create_param_objs(data, method, conf, errs, param_type, types=False,
     :param raml: raw RAML data to preserve order of URI parameters and \
         to create any that are not explicitly declared
     """
-    params = _get_attribute(param_type, method, data)
-    if types:
-        params = _get_inherited_item(params, param_type, types,
-                                     method, data)
+    data = _get(kwargs, "data", None)
+    method = _get(kwargs, "method", None)
+
+    # collect all relevant data
+    if not resolve:
+        resolve = ["method", "resource"]  # default
+
+    resolved = resolve_scalar_data(param_type, resolve, **kwargs)
+    if param_type == "queryParameters":
+        print("resolved 1: {0}".format(resolved))
+    resolved = create_resource_objects2(resolved, **kwargs)
+    if param_type == "queryParameters":
+        print("resolved 2: {0}".format(resolved))
+
+    # create parameter objects based off of the resolved data
+    conf = _get(kwargs, "conf", None)
+    errs = _get(kwargs, "errs", None)
     object_name = __map_object(param_type)
-    params = __create_base_param_obj(params, object_name, conf, errs,
+    if param_type == "body":
+        return create_bodies(resolved, kwargs)
+    if param_type == "responses":
+        return create_responses(resolved, kwargs)
+    params = __create_base_param_obj(resolved, object_name, conf, errs,
                                      method=method)
+
+    uri = _get(kwargs, "uri", None)
+
+    # if it's not a uri-type parameter, return, otherwise create uri-specific
+    # parameter objects
     if not uri:
         return params or None
+    base = _get(kwargs, "base", None)
+    root = _get(kwargs, "root", None)
     return _create_uri_params(uri, params, param_type, conf, errs, base=base,
-                              root=root, raml=raml)
+                              root=root, raml=data)
 
 
 def create_body(mime_type, data, root, method):
@@ -71,8 +95,14 @@ def create_body(mime_type, data, root, method):
     Create a ``.parameters.Body`` object.
     """
     raw = {mime_type: data}
-    form_params = create_param_objs(data, method, root.config, root.errors,
-                                    "formParameters")
+    kwargs = dict(
+        data=data,
+        method=method,
+        root=root,
+        errs=root.errors,
+        conf=root.config
+    )
+    form_params = create_param_objs("formParameters", **kwargs)
     return Body(
         mime_type=mime_type,
         raw=raw,
@@ -85,16 +115,15 @@ def create_body(mime_type, data, root, method):
     )
 
 
-def create_bodies(data, method, root, resource_types=False):
+def create_bodies(resolve, kwargs):
     """
     Returns a list of ``.parameters.Body`` objects.
     """
-    bodies = _get_attribute("body", method, data)
-    if resource_types:
-        bodies = _get_inherited_item(bodies, "body", resource_types,
-                                     method, data)
+    # bodies = resolve_scalar_data("body", resolve, **kwargs)
+    root = _get(kwargs, "root")
+    method = _get(kwargs, "method")
     body_objects = []
-    for k, v in list(iteritems(bodies)):
+    for k, v in list(iteritems(resolve)):
         if v is None:
             continue
         body = create_body(k, v, root, method)
@@ -136,17 +165,15 @@ def create_response(code, data, root, method, inherited_resp=None):
     )
 
 
-def create_responses(data, root, method, resource_types=None):
+def create_responses(resolve, kwargs):
     """
     Returns a list of ``.parameters.Response`` objects.
     """
+    root = _get(kwargs, "root")
+    method = _get(kwargs, "method")
     response_objects = []
-    responses = _get_attribute("responses", method, data)
-    if resource_types:
-        responses = _get_inherited_item(responses, "responses", resource_types,
-                                        method, data)
 
-    for key, value in list(iteritems(responses)):
+    for key, value in list(iteritems(resolve)):
         response = create_response(key, value, root, method)
         response_objects.append(response)
     return sorted(response_objects, key=lambda x: x.code) or None
@@ -235,14 +262,57 @@ def create_resource_objects(param, data, v, method, root, is_, uri=None):
                                                  root.config, root.errors,
                                                  method=method)
     else:
-        if param == "body":
-            param_objs = create_bodies(data, method, root)
-        elif param == "responses":
-            param_objs = create_responses(data, root, method)
-        else:
-            param_objs = create_param_objs(data, method, root.config,
-                                           root.errors, param, uri=uri)
+        kwargs = dict(
+            data=data,
+            method=method,
+            root=root,
+            conf=root.config,
+            errs=root.errors,
+            uri=uri
+        )
+        param_objs = create_param_objs(param, **kwargs)
     return param_objs or None
+
+
+def create_resource_objects2(resolved, **kwargs):
+    """
+    Returns a list of ``.parameter`` objects as designated by ``param``
+    from the given ``data``. Will parse data the object inherits if
+    assigned another resource type and/or trait(s).
+
+    :param str param: RAML-specified paramter, e.g. "resources", \
+        "queryParameters"
+    :param dict data: method-level ``param`` data
+    :param dict v: resource-type-level ``param`` data
+    :param str method: designated method
+    :param root: ``.raml.RootNode`` object
+    :param list is_: list of assigned traits, either ``str`` or
+        ``dict`` mapping key: value pairs to ``<<parameter>>`` values
+    """
+    is_ = _get(kwargs, "is_", None)
+    if is_:
+        for i in is_:
+            if isinstance(i, dict):
+                param_type = list(iterkeys(i))[0]
+                param_data = list(itervalues(i))[0]
+                resolved = _substitute_parameters(resolved, param_data)
+
+    type_ = _get(kwargs, "type_", None)
+    if type_:
+        if isinstance(type_, dict):
+            param_type = type_
+            param_data = list(itervalues(param_type))[0]
+            resolved = _substitute_parameters(resolved, param_data)
+    return resolved
+
+
+def _substitute_parameters(data, param_data):
+    json_data = json.dumps(data)
+    for key, value in list(iteritems(param_data)):
+        json_data = _replace_str_attr(key, value, json_data)
+    if isinstance(json_data, str):
+        json_data = json.loads(json_data, object_pairs_hook=OrderedDict)
+    return json_data
 
 
 # TODO: FIXME in order to use in parser.py
