@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from ramlfications.v2parser import parse_raml
+from ramlfications.parser import parse_raml
 from ramlfications.config import setup_config
 from ramlfications._helpers import load_file
 

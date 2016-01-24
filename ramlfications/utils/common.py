@@ -29,7 +29,7 @@ def _get(data, item, default=None):
         return default
 
 
-def __get_inherited_res_type_data(attr, types, name, method, root):
+def _get_inherited_res_type_data(attr, types, name, method, root):
     res_level = [
         "baseUriParameters", "uriParameters", "uri_params", "base_uri_params"
     ]
@@ -48,7 +48,7 @@ def __get_inherited_res_type_data(attr, types, name, method, root):
         attribute_data = _get(raw, attr, {})
         if not attribute_data and attr in res_level:
             attribute_data = _get(res_type_raml, attr, {})
-        if res_type_raml.get("type"):
+        if _get(res_type_raml, "type"):
             inherited = __resource_type_data(attr, root,
                                              res_type_raml.get("type"),
                                              method)
@@ -57,7 +57,7 @@ def __get_inherited_res_type_data(attr, types, name, method, root):
     return {}
 
 
-def __get_inherited_trait_data(attr, traits, name, root):
+def _get_inherited_trait_data(attr, traits, name, root):
     names = []
     for n in name:
         if isinstance(n, dict):
@@ -79,8 +79,8 @@ def __resource_type_data(attr, root, res_type, method):
         return {}
     raml = _get(root.raw, "resourceTypes")
     if raml:
-        return __get_inherited_res_type_data(attr, raml, res_type,
-                                             method, root)
+        return _get_inherited_res_type_data(attr, raml, res_type,
+                                            method, root)
 
 
 def merge_dicts(child, parent, path=[]):
@@ -100,3 +100,20 @@ def merge_dicts(child, parent, path=[]):
         else:
             child[key] = parent[key]
     return child
+
+
+def _map_attr(attribute):
+    """Map RAML attr name to ramlfications attr name"""
+    return {
+        "mediaType": "media_type",
+        "protocols": "protocols",
+        "headers": "headers",
+        "body": "body",
+        "responses": "responses",
+        "uriParameters": "uri_params",
+        "baseUriParameters": "base_uri_params",
+        "queryParameters": "query_params",
+        "formParameters": "form_params",
+        "description": "description",
+        "securedBy": "secured_by",
+    }[attribute]

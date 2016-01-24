@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from ramlfications.v2parser import parse_raml
+from ramlfications.parser import parse_raml
 from ramlfications.config import setup_config
 from ramlfications._helpers import load_file
 
@@ -62,7 +62,6 @@ def test_get_widgets(api):
     assert len(res.responses) == 3
     assert len(res.query_params) == 2
     assert len(res.form_params) == 1
-    # TODO: fixme - after/along with fixing uri_params function in create_node
     assert len(res.uri_params) == 1
 
     not_set = ["parent", "secured_by", "is_"]
