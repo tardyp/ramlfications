@@ -12,9 +12,9 @@ from ramlfications.parameters import (
     Response, Header, Body, URIParameter, SecurityScheme
 )
 from ramlfications.utils import load_schema
-from ramlfications.utils.common import _get
+from ramlfications.utils.common import _get, _substitute_parameters
 from ramlfications.utils.parameter import (
-    _remove_duplicates, _map_object, _substitute_parameters,
+    _remove_duplicates, _map_object,
     resolve_scalar_data
 )
 
@@ -192,12 +192,15 @@ def create_resource_objects(resolved, **kwargs):
     :param list is_: list of assigned traits, either ``str`` or
         ``dict`` mapping key: value pairs to ``<<parameter>>`` values
     """
+    _path = _get(kwargs, "resource_path", "resourcePath")
     is_ = _get(kwargs, "is_", None)
     if is_:
         for i in is_:
             if isinstance(i, dict):
                 param_type = list(iterkeys(i))[0]
                 param_data = list(itervalues(i))[0]
+                param_data["resourcePath"] = _path
+                param_data["resourcePathName"] = _path.lstrip("/")
                 resolved = _substitute_parameters(resolved, param_data)
 
     type_ = _get(kwargs, "type_", None)
@@ -205,6 +208,8 @@ def create_resource_objects(resolved, **kwargs):
         if isinstance(type_, dict):
             param_type = type_
             param_data = list(itervalues(param_type))[0]
+            param_data["resourcePath"] = _path
+            param_data["resourcePathName"] = _path.lstrip("/")
             resolved = _substitute_parameters(resolved, param_data)
     return resolved
 

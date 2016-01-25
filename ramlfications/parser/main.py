@@ -465,7 +465,8 @@ def _create_resource_node(name, raw_data, method, parent, root):
         resource_data=raw_data,
         root_=root,
         parent_data=parent_data,
-        root=root
+        root=root,
+        resource_path=resource_path
     )
 
     node = create_node_dict()
@@ -491,11 +492,7 @@ def _create_base_node(name, root, node_type, kwargs, resolve_from=[]):
         return m or r or name
 
     def description():
-        method_data = _get(kwargs, "data", {})
-        resource_data = _get(kwargs, "resource_data", {})
-        m, r = resolve_scalar(method_data, resource_data, "description",
-                              default=None)
-        return m or r or None
+        return resolve_inherited_scalar("description", resolve_from, **kwargs)
 
     def protocols():
         if _get(kwargs, "parent_data"):

@@ -7,7 +7,7 @@ from six import iterkeys
 
 from .common import (
     _get, _get_inherited_trait_data, _get_inherited_res_type_data,
-    _map_attr
+    _map_attr, _substitute_parameters
 )
 
 
@@ -47,10 +47,20 @@ def resolve_inherited_scalar(item, inherit_from=[], **kwargs):
     Returns data associated with item (e.g. ``protocols``) while
     preserving order of inheritance.
     """
+    path = _get(kwargs, "resource_path")
+    path_name = "<<resourcePathName>>"
+    if path:
+        path_name = path.lstrip("/")
+    else:
+        path = "<<resourcePath>>"
     for obj_type in inherit_from:
         inherit_func = __map_inheritance(obj_type)
         inherited = inherit_func(item, **kwargs)
         if inherited:
+            param = {}
+            param["resourcePath"] = path
+            param["resourcePathName"] = path_name
+            inherited = _substitute_parameters(inherited, param)
             return inherited
     return None
 

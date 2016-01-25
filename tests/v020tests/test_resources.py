@@ -8,7 +8,7 @@ import pytest
 
 from ramlfications.parser import parse_raml
 from ramlfications.config import setup_config
-from ramlfications._helpers import load_file
+from ramlfications.utils import load_file
 
 from tests.base import V020EXAMPLES, assert_not_set, assert_not_set_raises
 

@@ -3,13 +3,6 @@
 
 from __future__ import absolute_import, division, print_function
 
-import json
-import re
-
-try:
-    from collections import OrderedDict
-except ImportError:  # pragma: no cover
-    from ordereddict import OrderedDict
 
 from six import iterkeys, iteritems
 
@@ -17,13 +10,10 @@ from .common import (
     _get, _get_inherited_trait_data, _get_inherited_res_type_data,
     merge_dicts, _map_attr
 )
-from . import tags
+
 from ramlfications.parameters import (
     Body, Response, Header, QueryParameter, URIParameter, FormParameter,
 )
-
-# pattern for `<<parameter>>` substitution
-PATTERN = r'(<<\s*)(?P<pname>{0}\b[^\s|]*)(\s*\|?\s*(?P<tag>!\S*))?(\s*>>)'
 
 
 # TODO: not sure I need this here ... I'm essentially creating another
@@ -60,37 +50,6 @@ def _remove_duplicates(inherit_params, resource_params):
                 ret.append(p)
     ret.extend(resource_params)
     return ret or None
-
-
-def _replace_str_attr(param, new_value, current_str):
-    """
-    Replaces ``<<parameters>>`` with their assigned value, processed with \
-    any function tags, e.g. ``!pluralize``.
-    """
-    p = re.compile(PATTERN.format(param))
-    ret = re.findall(p, current_str)
-    if not ret:
-        return current_str
-    for item in ret:
-        to_replace = "".join(item[0:3]) + item[-1]
-        tag_func = item[3]
-        if tag_func:
-            tag_func = tag_func.strip("!")
-            tag_func = tag_func.strip()
-            func = getattr(tags, tag_func)
-            if func:
-                new_value = func(new_value)
-        current_str = current_str.replace(to_replace, str(new_value), 1)
-    return current_str
-
-
-def _substitute_parameters(data, param_data):
-    json_data = json.dumps(data)
-    for key, value in list(iteritems(param_data)):
-        json_data = _replace_str_attr(key, value, json_data)
-    if isinstance(json_data, str):
-        json_data = json.loads(json_data, object_pairs_hook=OrderedDict)
-    return json_data
 
 
 def _map_object(param_type):

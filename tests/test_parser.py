@@ -10,7 +10,7 @@ import xmltodict
 from ramlfications import parser as pw
 from ramlfications.config import setup_config
 from ramlfications.raml import RootNode, ResourceTypeNode, TraitNode
-from ramlfications._helpers import load_file
+from ramlfications.utils import load_file
 
 from .base import EXAMPLES
 
@@ -362,7 +362,6 @@ def test_inherited_assigned_trait_params_books(trait_parameters):
     assert len(res.query_params) == 4
     assert len(res.headers) == 1
     assert len(res.body) == 1
-    # TODO: FIXME - returns len 2
     assert len(res.responses) == 1
 
     q_param = res.query_params[1]
@@ -403,8 +402,7 @@ def test_inherited_assigned_trait_params_articles(trait_parameters):
     assert len(res.query_params) == 4
     assert len(res.headers) == 1
     assert len(res.body) == 1
-    # TODO: FIXME returns len 2
-    # assert len(res.responses) == 1
+    assert len(res.responses) == 1
 
     q_param = res.query_params[1]
     assert q_param.name == "foo_token"
@@ -485,20 +483,17 @@ def test_assigned_trait_params(trait_parameters):
     assert not secured.responses
     assert not secured.uri_params
 
-    # TODO: FIXME
-    # q_param = secured.query_params[0]
-    # assert q_param.name == "access_token"
-    # assert q_param.description.raw == "A valid access_token is required"
+    q_param = secured.query_params[0]
+    assert q_param.name == "<<tokenName>>"
+    assert q_param.description.raw == "A valid <<tokenName>> is required"
 
-    # TODO: FIXME
-    # header = secured.headers[0]
-    # assert header.name == "x-some-header"
-    # assert header.description.raw == "x-some-header is required here"
+    header = secured.headers[0]
+    assert header.name == "<<aHeaderName>>"
+    assert header.description.raw == "<<aHeaderName>> is required here"
 
-    # TODO: FIXME
-    # body = secured.body[0]
-    # assert body.mime_type == "application/json"
-    # assert body.schema == "foo-schema"
+    body = secured.body[0]
+    assert body.mime_type == "application/json"
+    assert body.schema == "<<schemaName>>"
 
     paged = res.traits[1]
     assert paged.name == "paged"
@@ -509,19 +504,17 @@ def test_assigned_trait_params(trait_parameters):
 
     q_param = paged.query_params[0]
     assert q_param.name == "numPages"
-    # TODO: FIXME
-    # desc = "The number of pages to return, not to exceed 10"
-    # assert q_param.description.raw == desc
+    desc = "The number of pages to return, not to exceed <<maxPages>>"
+    assert q_param.description.raw == desc
 
     resp = paged.responses[0]
     assert resp.code == 200
-    # TODO FIXME
-    # assert resp.description.raw == "No more than 10 pages returned"
+    assert resp.description.raw == "No more than <<maxPages>> pages returned"
     assert len(resp.headers) == 1
 
-    # assert resp.headers[0].name == "x-another-header"
-    # desc = "some description for x-another-header"
-    # assert resp.headers[0].description.raw == desc
+    assert resp.headers[0].name == "<<anotherHeader>>"
+    desc = "some description for <<anotherHeader>>"
+    assert resp.headers[0].description.raw == desc
 
 
 # make sure root trait params are not changed after processing
@@ -567,12 +560,12 @@ def test_root_trait_params(trait_parameters):
     # TODO: FIXME - should be none, but getting copied when assigned to
     #               resources
     # assert not resp.method
-    # assert resp.description.raw == "No more than <<maxPages>> pages returned"
+    assert resp.description.raw == "No more than <<maxPages>> pages returned"
     assert len(resp.headers) == 1
 
-    # assert resp.headers[0].name == "<<anotherHeader>>"
-    # desc = "some description for <<anotherHeader>>"
-    # assert resp.headers[0].description.raw == desc
+    assert resp.headers[0].name == "<<anotherHeader>>"
+    desc = "some description for <<anotherHeader>>"
+    assert resp.headers[0].description.raw == desc
 
 
 # Test `<< parameter | !function >>` handling
@@ -910,17 +903,15 @@ def test_inherit_resource_type_params(resource_type_parameters):
 
     q_param = res.query_params[2]
     assert q_param.name == "title"
-    # TODO: FIXME
-    # desc = ("Return books that have their title matching "
-    #         "the given value")
-    # assert q_param.description.raw == desc
+    desc = ("Return books that have their title matching "
+            "the given value")
+    assert q_param.description.raw == desc
 
     q_param = res.query_params[3]
     assert q_param.name == "digest_all_fields"
-    # TODO: FIXME
-    # desc = ("If no values match the value given for title, use "
-    #         "digest_all_fields instead")
-    # assert q_param.description.raw == desc
+    desc = ("If no values match the value given for title, use "
+            "digest_all_fields instead")
+    assert q_param.description.raw == desc
 
 
 def test_assigned_resource_type_params(resource_type_parameters):
@@ -978,25 +969,25 @@ def test_resource_type_pluralize(param_functions):
     assert res.name == "/users"
     assert res.method == "post"
     assert res.type == "collection_single"
-    # assert res.description.raw == "Post user"
+    assert res.description.raw == "Post user"
 
     res = param_functions.resources[0]
     assert res.name == "/users"
     assert res.method == "get"
     assert res.type == "collection_single"
-    # assert res.description.raw == "Get users"
+    assert res.description.raw == "Get users"
 
     res = param_functions.resources[3]
     assert res.name == "/user"
     assert res.method == "post"
     assert res.type == "collection_plural"
-    # assert res.description.raw == "Post user"
+    assert res.description.raw == "Post user"
 
     res = param_functions.resources[2]
     assert res.name == "/user"
     assert res.method == "get"
     assert res.type == "collection_plural"
-    # assert res.description.raw == "Get users"
+    assert res.description.raw == "Get users"
 
 
 #####

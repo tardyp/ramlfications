@@ -4,6 +4,7 @@
 from __future__ import absolute_import, division, print_function
 
 
+from io import open
 import json
 import logging
 import os
