@@ -467,7 +467,8 @@ def _create_resource_node(name, raw_data, method, parent, root):
         root_=root,
         parent_data=parent_data,
         root=root,
-        resource_path=resource_path
+        resource_path=resource_path,
+        conf=root.config,
     )
 
     node = create_node_dict()
@@ -533,7 +534,9 @@ def _create_base_node(name, root, node_type, kwargs, resolve_from=[]):
         m, r = resolve_scalar(_get(kwargs, "data"),
                               _get(kwargs, "resource_data"),
                               "is", default=[])
-        return m + r or None
+        if isinstance(m, list) and isinstance(r, list):
+            return m + r
+        return m or r or None
 
     def type_():
         m, r = resolve_scalar(_get(kwargs, "data"),
@@ -543,6 +546,10 @@ def _create_base_node(name, root, node_type, kwargs, resolve_from=[]):
 
     def traits_():
         trait_objs = []
+        if not isinstance(assigned_traits, list):
+            # I think validate.py would error out so
+            # I don't think anything is needed here...
+            return None
         for trait in assigned_traits:
             obj = [t for t in root.traits if t.name == trait]
             if obj:

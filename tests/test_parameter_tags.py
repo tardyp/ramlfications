@@ -3,7 +3,7 @@
 from __future__ import absolute_import, division, print_function
 
 
-from ramlfications import _parameter_tags as pt
+from ramlfications.utils import tags
 
 
 PAIRINGS = [
@@ -16,15 +16,16 @@ PAIRINGS = [
     ("ethos", "ethoses")
 ]
 
+
 def test_pluralize():
     for p in PAIRINGS:
         exp = p[1]
-        ret = pt.pluralize(p[0])
+        ret = tags.pluralize(p[0])
         assert exp == ret
 
 
 def test_singularize():
     for p in PAIRINGS:
         exp = p[0]
-        ret = pt.singularize(p[1])
+        ret = tags.singularize(p[1])
         assert exp == ret

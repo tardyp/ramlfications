@@ -192,16 +192,26 @@ def create_resource_objects(resolved, **kwargs):
     :param list is_: list of assigned traits, either ``str`` or
         ``dict`` mapping key: value pairs to ``<<parameter>>`` values
     """
-    _path = _get(kwargs, "resource_path", "resourcePath")
+    _path = _get(kwargs, "resource_path")
+    if _path:
+        _path_name = _path.lstrip("/")
+    else:
+        _path = "<<resourcePath>>"
+        _path_name = "<<resourcePathName>>"
     is_ = _get(kwargs, "is_", None)
     if is_:
-        for i in is_:
-            if isinstance(i, dict):
-                param_type = list(iterkeys(i))[0]
-                param_data = list(itervalues(i))[0]
-                param_data["resourcePath"] = _path
-                param_data["resourcePathName"] = _path.lstrip("/")
-                resolved = _substitute_parameters(resolved, param_data)
+        if not isinstance(is_, list):
+            # I think validate.py would error out so
+            # I don't think anything is needed here...
+            pass
+        else:
+            for i in is_:
+                if isinstance(i, dict):
+                    param_type = list(iterkeys(i))[0]
+                    param_data = list(itervalues(i))[0]
+                    param_data["resourcePath"] = _path
+                    param_data["resourcePathName"] = _path_name
+                    resolved = _substitute_parameters(resolved, param_data)
 
     type_ = _get(kwargs, "type_", None)
     if type_:
@@ -209,7 +219,7 @@ def create_resource_objects(resolved, **kwargs):
             param_type = type_
             param_data = list(itervalues(param_type))[0]
             param_data["resourcePath"] = _path
-            param_data["resourcePathName"] = _path.lstrip("/")
+            param_data["resourcePathName"] = _path_name
             resolved = _substitute_parameters(resolved, param_data)
     return resolved
 

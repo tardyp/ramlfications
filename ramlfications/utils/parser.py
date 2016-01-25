@@ -82,12 +82,12 @@ def __trait(item, **kwargs):
         raml = _get(root.raw, "traits")
         if raml:
             data = _get_inherited_trait_data(item, raml, is_, root)
-            ret = {}
-            for i in data:
-                _data = _get(i, item)
-                ret[item] = _data
-            return ret
-            # return _get(data, item)
+            # ret = {}
+            # for i in data:
+            #     _data = _get(i, item)
+            #     ret[item] = _data
+            # return ret
+            return _get(data, item)
 
 
 def __resource_type(item, **kwargs):

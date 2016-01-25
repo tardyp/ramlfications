@@ -72,10 +72,13 @@ def _get_inherited_res_type_data(attr, types, name, method, root):
 
 def _get_inherited_trait_data(attr, traits, name, root):
     names = []
-    for n in name:
-        if isinstance(n, dict):
-            n = list(iterkeys(n))[0]
-        names.append(n)
+    if not isinstance(name, list):
+        names.append(name)
+    else:
+        for n in name:
+            if isinstance(n, dict):
+                n = list(iterkeys(n))[0]
+            names.append(n)
 
     trait_raml = [t for t in traits if list(iterkeys(t))[0] in names]
     trait_data = []
@@ -108,8 +111,8 @@ def merge_dicts(child, parent, path=[]):
                 merge_dicts(child[key], parent[key], path + [str(key)])
             elif child[key] == parent[key]:
                 pass  # same leaf value
-            else:
-                print('Conflict at %s' % '.'.join(path + [str(key)]))
+            # else:
+                # print('Conflict at %s' % '.'.join(path + [str(key)]))
         else:
             child[key] = parent[key]
     return child

@@ -162,8 +162,12 @@ def _parse_xml_data(xml_data):
 
 def _save_updated_mime_types(output_file, mime_types):
     """Save the updated MIME Media types within the package."""
-    with open(output_file, "w") as f:
-        json.dump(mime_types, f)
+    # not sure why json.dump(mime_types) doesn't work, raises a TypeError
+    # saying it should be unicode. So loading in memory then making the
+    # str -> unicode
+    data = json.dumps(mime_types)
+    with open(output_file, "w", encoding="UTF-8") as f:
+        f.write(unicode(data))
 
 
 def update_mime_types():
