@@ -33,7 +33,7 @@ def parse_assigned_dicts(items):
     if isinstance(items, list):
         item_names = []
         for i in items:
-            if isinstance(i, str):
+            if isinstance(i, basestring):
                 item_names.append(i)
             elif isinstance(i, dict):
                 name = list(iterkeys(i))[0]
@@ -55,13 +55,12 @@ def resolve_inherited_scalar(item, inherit_from=[], **kwargs):
         path = "<<resourcePath>>"
     for obj_type in inherit_from:
         inherit_func = __map_inheritance(obj_type)
-        inherited = inherit_func(item, **kwargs)
-        if inherited:
+        inh = inherit_func(item, **kwargs)
+        if inh:
             param = {}
             param["resourcePath"] = path
             param["resourcePathName"] = path_name
-            inherited = _substitute_parameters(inherited, param)
-            return inherited
+            return _substitute_parameters(inh, param)
     return None
 
 
@@ -83,7 +82,12 @@ def __trait(item, **kwargs):
         raml = _get(root.raw, "traits")
         if raml:
             data = _get_inherited_trait_data(item, raml, is_, root)
-            return _get(data, item)
+            ret = {}
+            for i in data:
+                _data = _get(i, item)
+                ret[item] = _data
+            return ret
+            # return _get(data, item)
 
 
 def __resource_type(item, **kwargs):
@@ -108,14 +112,16 @@ def __get_parent(attribute, parent):
 
 
 def __method(item, **kwargs):
-    method = kwargs.get("method")
+    # method = kwargs.get("method")
     data = kwargs.get("data")
-    method_data = _get(data, method, {})
-    return _get(method_data, item, {})
+    # method_data = _get(data, method, {})
+    # return _get(method_data, item, {})
+    return _get(data, item, {})
 
 
 def __resource(item, **kwargs):
-    data = kwargs.get("data")
+    # data = kwargs.get("data")
+    data = _get(kwargs, "resource_data", {})
     return _get(data, item, {})
 
 

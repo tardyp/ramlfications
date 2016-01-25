@@ -253,7 +253,8 @@ def _create_trait_node(name, data, root):
         errs=root.errors,
         conf=root.config
     )
-    node = _create_base_node(name, root, "trait", kwargs)
+    resolve_from = ["method"]
+    node = _create_base_node(name, root, "trait", kwargs, resolve_from)
     node["protocols"] = _get(data, "protocols")
     node["usage"] = _get(data, "usage")
     node["media_type"] = _get(data, "mediaType")
@@ -549,11 +550,7 @@ def _create_base_node(name, root, node_type, kwargs, resolve_from=[]):
         return trait_objs or None
 
     def secured_by():
-        kw = dict(method=_get(kwargs, "method", None),
-                  data=_get(kwargs, "resource_data", {}),
-                  root=root)
-        objects_to_inherit = ["method", "resource", "root"]
-        return resolve_inherited_scalar("securedBy", objects_to_inherit, **kw)
+        return resolve_inherited_scalar("securedBy", resolve_from, **kwargs)
 
     def security_schemes(secured):
         assigned_sec_schemes = parse_assigned_dicts(secured)
