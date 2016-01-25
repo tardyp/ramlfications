@@ -469,6 +469,7 @@ def _create_resource_node(name, raw_data, method, parent, root):
         root=root,
         resource_path=resource_path,
         conf=root.config,
+        errs=root.errors,
     )
 
     node = create_node_dict()
@@ -535,7 +536,7 @@ def _create_base_node(name, root, node_type, kwargs, resolve_from=[]):
                               _get(kwargs, "resource_data"),
                               "is", default=[])
         if isinstance(m, list) and isinstance(r, list):
-            return m + r
+            return m + r or None
         return m or r or None
 
     def type_():
