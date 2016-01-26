@@ -885,6 +885,45 @@ def test_resource_type_empty_mapping_headers():
     assert base_res_type.headers[-1].description is None
 
 
+def test_resource_type_no_method():
+    raml_file = os.path.join(EXAMPLES + "resource_type_no_method.raml")
+    loaded_raml_file = load_file(raml_file)
+    config = setup_config(EXAMPLES + "test-config.ini")
+    config['validate'] = False
+    api = pw.parse_raml(loaded_raml_file, config)
+
+    res_type = api.resource_types[0]
+    assert not res_type.method
+    assert res_type.description.raw == "this resource type has no method"
+
+
+def test_resource_type_protocols_method():
+    raml_file = os.path.join(EXAMPLES + "resource-type-method-protocols.raml")
+    loaded_raml_file = load_file(raml_file)
+    config = setup_config(EXAMPLES + "test-config.ini")
+    config['validate'] = False
+    api = pw.parse_raml(loaded_raml_file, config)
+
+    res_type = api.resource_types[0]
+    assert res_type.protocols == ["HTTP"]
+    desc = "this resource type defines a protocol at the method level"
+    assert res_type.description.raw == desc
+
+
+def test_resource_type_protocols_resource():
+    _name = "resource-type-resource-protocols.raml"
+    raml_file = os.path.join(EXAMPLES + _name)
+    loaded_raml_file = load_file(raml_file)
+    config = setup_config(EXAMPLES + "test-config.ini")
+    config['validate'] = False
+    api = pw.parse_raml(loaded_raml_file, config)
+
+    res_type = api.resource_types[0]
+    assert res_type.protocols == ["HTTP"]
+    desc = "this resource type defines a protocol in the resource level"
+    assert res_type.description.raw == desc
+
+
 @pytest.fixture(scope="session")
 def resource_type_parameters():
     raml_file = os.path.join(EXAMPLES + "resource-type-trait-parameters.raml")

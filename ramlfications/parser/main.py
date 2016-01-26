@@ -340,6 +340,7 @@ def _create_resource_type_node(name, method_data, method, resource_data, root):
         node["optional"] = optional()
         node["method"] = _get(kwargs, "method")
         node["usage"] = _get(resource_data, "usage")
+        node["protocols"] = protocols()
         return node
 
     kwargs = dict(
