@@ -13,10 +13,7 @@ from ramlfications.parameters import (
 )
 from ramlfications.utils import load_schema
 from ramlfications.utils.common import _get, _substitute_parameters
-from ramlfications.utils.parameter import (
-    _remove_duplicates, _map_object,
-    resolve_scalar_data
-)
+from ramlfications.utils.parameter import _map_object, resolve_scalar_data
 
 
 #####
@@ -115,18 +112,11 @@ def create_bodies(resolve, kwargs):
     return body_objects or None
 
 
-def create_response(code, data, root, method, inherited_resp=None):
+def create_response(code, data, root, method):
     """Returns a :py:class:`.parameters.Response` object"""
     headers = _create_response_headers(data, method, root)
     body = _create_response_body(data, root, method)
     desc = _get(data, "description", None)
-    if inherited_resp:
-        if inherited_resp.headers:
-            headers = _remove_duplicates(inherited_resp.headers, headers)
-        if inherited_resp.body:
-            body = _remove_duplicates(inherited_resp.body, body)
-        if inherited_resp.desc and not desc:
-            desc = inherited_resp.desc
 
     # when substituting `<<parameters>>`, everything gets turned into
     # a string/unicode. Try to make it an int, and if not, validate.py
@@ -161,20 +151,6 @@ def create_responses(resolve, kwargs):
         response = create_response(key, value, root, method)
         response_objects.append(response)
     return sorted(response_objects, key=lambda x: x.code) or None
-
-
-def create_security_scheme(scheme, data, root):
-    """Create a :py:class:`.parameters.SecurityScheme` object."""
-    return SecurityScheme(
-        name=scheme,
-        raw=data,
-        type=_get(data, "type"),
-        described_by=_get(data, "describedBy"),
-        desc=_get(data, "description"),
-        settings=_get(data, "settings"),
-        config=root.config,
-        errors=root.errors
-    )
 
 
 def create_resource_objects(resolved, **kwargs):
